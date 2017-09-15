@@ -46,44 +46,56 @@ defmodule Actor do
 end
 
 
-defmodule LoadDistributor do
-  
-  def listen(k) do
+defmodule Client do
+  def startClient(serverAddr) do
+    {:ok, ipAddList} = :inet.getif()
+      ipAddr = "client@" <> Server.getIPAdress(ipAddList)
+      Node.start(String.to_atom(ipAddr))
+      Node.set_cookie("project1")
+      Node.connect(String.to_atom("server@" <> serverAddr))
+  end
+
+  def listen(k, limit, zeroes) do
     receive do
       {:true, res, hash, pid} -> 
         IO.puts "yes"
         IO.puts res
         IO.puts hash
-        listen(k)
+        listen(k, limit, zeroes)
       {:done, pid} ->
-        Actor.findKeys(pid, {:process, self(), "abhinavpodduturi:", k, 4});
-        listen(k+1)
+        if (k > limit) do
+          listen(k, limit, zeroes)
+        else
+          Actor.findKeys(pid, {:process, self(), "abhinavpodduturi:", k, zeroes});
+          listen(k+1, limit, zeroes)
+        end        
     end
   end
 
-  def start(zeroes) do
-      {:ok, ipAddList} = :inet.getif()
-      ipAddr = "server@" <> getIPAdress(ipAddList)
-      Node.start(ipAddr)
-      Node.set_cookie("project1")
-      spawn(LoadDistributor, :startDistributor, [1, 20, zeroes])
-      #Node.connect("server@" <> serverAddr)
-  end
-
   def startDistributor(start, limit, zeroes) do
-    
     {:ok, pidOne} = Actor.start_link()
     {:ok, pidTwo} = Actor.start_link()
     {:ok, pidThree} = Actor.start_link()
     {:ok, pidFour} = Actor.start_link()
-    
-    Actor.findKeys(pidOne, {:process, self(), "abhinavpodduturi:", 1, 4})
-    Actor.findKeys(pidTwo, {:process, self(), "abhinavpodduturi:", 2, 4})
-    Actor.findKeys(pidThree, {:process, self(), "abhinavpodduturi:", 3, 4})
-    Actor.findKeys(pidFour, {:process, self(), "abhinavpodduturi:", 4, 4})
-    listen(5)
-  end
+    {:ok, pidFive} = Actor.start_link()
+    {:ok, pidSix} = Actor.start_link()
+    {:ok, pidSeven} = Actor.start_link()
+    {:ok, pidEight} = Actor.start_link()
 
+    Actor.findKeys(pidOne, {:process, self(), "abhinavpodduturi:", start, zeroes})
+    Actor.findKeys(pidTwo, {:process, self(), "abhinavpodduturi:", start+1, zeroes})
+    Actor.findKeys(pidThree, {:process, self(), "abhinavpodduturi:", start+2, zeroes})
+    Actor.findKeys(pidFour, {:process, self(), "abhinavpodduturi:", start+3, zeroes})
+    Actor.findKeys(pidFive, {:process, self(), "abhinavpodduturi:", start+4, zeroes})
+    Actor.findKeys(pidSix, {:process, self(), "abhinavpodduturi:", start+5, zeroes})
+    Actor.findKeys(pidSeven, {:process, self(), "abhinavpodduturi:", start+6, zeroes})
+    Actor.findKeys(pidEight, {:process, self(), "abhinavpodduturi:", start+7, zeroes})
+    
+    listen(start+8, limit, zeroes)
+  end
+end
+
+defmodule Server do  
   def getIPAdress(ipAddList) when ipAddList == [] do
     ""
   end
@@ -99,5 +111,33 @@ defmodule LoadDistributor do
       getIPAdress(tail)
     end
   end
-  
+
+  def assignToNode(list, cur, zeroes) when list == [] do
+    cur
+  end
+
+  def assignToNode(list, cur, zeroes) do
+    [head | tail] = list
+    Node.spawn(head, Client, :startDistributor, [cur, cur+8, zeroes])
+    assignToNode(tail, cur+8, zeroes)
+  end
+
+  def monitorNewConnections(cur, zeroes, list) do
+    newList = Node.list()
+    Enum.sort(newList)
+    diffList = newList - list
+    list = newList
+    cur = assignToNode(diffList, cur, zeroes)
+    :timer.sleep(5000)
+    monitorNewConnections(cur, zeroes, list)
+  end
+
+  def startServer(zeroes) do
+      {:ok, ipAddList} = :inet.getif()
+      ipAddr = "server@" <> getIPAdress(ipAddList)
+      Node.start(String.to_atom(ipAddr))
+      Node.set_cookie("project1")
+      spawn(Client, :startDistributor, [1, 20, zeroes])
+      monitorNewConnections(21, zeroes, Node.list())
+  end
 end

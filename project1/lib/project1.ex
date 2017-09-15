@@ -70,7 +70,15 @@ defmodule LoadDistributor do
     Actor.findKeys(pidTwo, {:process, self(), "abhinavpodduturi:", 2, 4})
     Actor.findKeys(pidThree, {:process, self(), "abhinavpodduturi:", 3, 4})
     Actor.findKeys(pidFour, {:process, self(), "abhinavpodduturi:", 4, 4})
-    listen(5)
+    {:ok, pidFive} = Actor.start_link()
+    {:ok, pidSix} = Actor.start_link()
+    {:ok, pidSeven} = Actor.start_link()
+    {:ok, pidEight} = Actor.start_link()
+    Actor.findKeys(pidFive, {:process, self(), "abhinavpodduturi:", 5, 4})
+    Actor.findKeys(pidSix, {:process, self(), "abhinavpodduturi:", 6, 4})
+    Actor.findKeys(pidSeven, {:process, self(), "abhinavpodduturi:", 7, 4})
+    Actor.findKeys(pidEight, {:process, self(), "abhinavpodduturi:", 8, 4})
+    listen(9)
   end
 
   

@@ -137,7 +137,7 @@ defmodule Server do
       ipAddr = "server@" <> getIPAdress(ipAddList)
       Node.start(String.to_atom(ipAddr))
       Node.set_cookie(:"project1")
-      spawn(Client, :startDistributor, [1, 20, zeroes])
-      monitorNewConnections(21, zeroes, [])
+      spawn(Client, :startDistributor, [1, 13, zeroes])
+      monitorNewConnections(14, zeroes, [])
   end
 end

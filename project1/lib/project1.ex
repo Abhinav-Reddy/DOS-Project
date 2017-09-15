@@ -141,3 +141,19 @@ defmodule Server do
       monitorNewConnections(21, zeroes, Node.list())
   end
 end
+
+
+defmodule TestNodes do
+  
+     def createConnection() do
+  
+      Node.start(:"ajantha@10.136.8.33")
+      Node.set_cookie(:"monster")
+      Node.ping :"a@10.136.142.168"
+      IO.puts "Connection Made"
+      # Node.connect(:"a@10.136.142.168")
+  
+      # Node.spawn(:"a@10.136.142.168", LoadDistributor.start)
+  
+    end 
+end

@@ -118,7 +118,7 @@ defmodule Server do
 
   def assignToNode(list, cur, zeroes) do
     [head | tail] = list
-    Node.spawn(head, Client, :startDistributor, [cur, cur+8, zeroes])
+    Node.spawn(head, Client, :startDistributor, [cur, cur+7, zeroes])
     assignToNode(tail, cur+8, zeroes)
   end
 
@@ -138,22 +138,6 @@ defmodule Server do
       Node.start(String.to_atom(ipAddr))
       Node.set_cookie(:"project1")
       spawn(Client, :startDistributor, [1, 20, zeroes])
-      monitorNewConnections(21, zeroes, Node.list())
+      monitorNewConnections(21, zeroes, [])
   end
-end
-
-
-defmodule TestNodes do
-  
-     def createConnection() do
-  
-      Node.start(:"ajantha@10.136.8.33")
-      Node.set_cookie(:"monster")
-      Node.ping :"a@10.136.142.168"
-      IO.puts "Connection Made"
-      # Node.connect(:"a@10.136.142.168")
-  
-      # Node.spawn(:"a@10.136.142.168", LoadDistributor.start)
-  
-    end 
 end

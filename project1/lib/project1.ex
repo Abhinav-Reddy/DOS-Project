@@ -61,11 +61,22 @@ defmodule LoadDistributor do
     end
   end
 
-  def start() do
+  def start(zeroes) do
+      {:ok, ipAddList} = :inet.getif()
+      ipAddr = "server@" <> getIPAdress(ipAddList)
+      Node.start(ipAddr)
+      Node.set_cookie("project1")
+      spawn(LoadDistributor, :startDistributor, [1, 20, zeroes])
+      #Node.connect("server@" <> serverAddr)
+  end
+
+  def startDistributor(start, limit, zeroes) do
+    
     {:ok, pidOne} = Actor.start_link()
     {:ok, pidTwo} = Actor.start_link()
     {:ok, pidThree} = Actor.start_link()
     {:ok, pidFour} = Actor.start_link()
+    
     Actor.findKeys(pidOne, {:process, self(), "abhinavpodduturi:", 1, 4})
     Actor.findKeys(pidTwo, {:process, self(), "abhinavpodduturi:", 2, 4})
     Actor.findKeys(pidThree, {:process, self(), "abhinavpodduturi:", 3, 4})
@@ -73,5 +84,20 @@ defmodule LoadDistributor do
     listen(5)
   end
 
+  def getIPAdress(ipAddList) when ipAddList == [] do
+    ""
+  end
+
+  def getIPAdress(ipAddList) do
+    [head | tail] = ipAddList
+    {ip,_,_} = head
+    {one, two, three, four} = ip
+    if (one == 10 || (one == 192 && two == 168)) do
+      Integer.to_string(one) <> "." <> Integer.to_string(two) <> "." 
+      <> Integer.to_string(three) <> "." <> Integer.to_string(four)
+    else
+      getIPAdress(tail)
+    end
+  end
   
 end

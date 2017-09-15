@@ -51,7 +51,7 @@ defmodule Client do
     {:ok, ipAddList} = :inet.getif()
       ipAddr = "client@" <> Server.getIPAdress(ipAddList)
       Node.start(String.to_atom(ipAddr))
-      Node.set_cookie("project1")
+      Node.set_cookie(:"project1")
       Node.connect(String.to_atom("server@" <> serverAddr))
   end
 
@@ -125,7 +125,7 @@ defmodule Server do
   def monitorNewConnections(cur, zeroes, list) do
     newList = Node.list()
     Enum.sort(newList)
-    diffList = newList - list
+    diffList = newList -- list
     list = newList
     cur = assignToNode(diffList, cur, zeroes)
     :timer.sleep(5000)
@@ -136,7 +136,7 @@ defmodule Server do
       {:ok, ipAddList} = :inet.getif()
       ipAddr = "server@" <> getIPAdress(ipAddList)
       Node.start(String.to_atom(ipAddr))
-      Node.set_cookie("project1")
+      Node.set_cookie(:"project1")
       spawn(Client, :startDistributor, [1, 20, zeroes])
       monitorNewConnections(21, zeroes, Node.list())
   end

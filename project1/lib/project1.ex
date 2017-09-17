@@ -47,14 +47,25 @@ end
 
 
 defmodule Client do
+  
+  def checkForTermination(serverAddr) do
+    :timer.sleep(5000)
+    if (Enum.member?(Node.list(), serverAddr) == true) do
+      checkForTermination(serverAddr)
+    end
+    
+  end
+  
   def startClient(serverAddr) do
     {:ok, ipAddList} = :inet.getif()
       ipAddr = "client@" <> Server.getIPAdress(ipAddList)
       Node.start(String.to_atom(ipAddr))
       Node.set_cookie(:"project1")
       Node.connect(String.to_atom("server@" <> serverAddr))
+      checkForTermination(String.to_atom("server@" <> serverAddr))
   end
 
+  
   def listen(k, limit, zeroes) do
     receive do
       {:true, res, hash, pid} -> 

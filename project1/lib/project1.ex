@@ -141,3 +141,20 @@ defmodule Server do
       monitorNewConnections(14, zeroes, [])
   end
 end
+
+defmodule Project1 do
+  def main([]) do
+    IO.puts "Enter Valid Number of Zeros or IP Address that connects to Server"
+  end
+
+  def main(argv) do
+    val = List.first(argv)
+    if String.contains? val, "." do
+      Client.startClient(val)
+    else
+      zero_count = String.to_integer(val)
+      Server.startServer(zero_count)
+    end
+    
+  end
+end

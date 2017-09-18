@@ -83,32 +83,24 @@ defmodule Client do
     end
   end
 
-  def startDistributor(start, limit, zeroes) do
-    {:ok, pidOne} = Actor.start_link()
-    {:ok, pidTwo} = Actor.start_link()
-    {:ok, pidThree} = Actor.start_link()
-    {:ok, pidFour} = Actor.start_link()
-    {:ok, pidFive} = Actor.start_link()
-    {:ok, pidSix} = Actor.start_link()
-    {:ok, pidSeven} = Actor.start_link()
-    {:ok, pidEight} = Actor.start_link()
-
-    Actor.findKeys(pidOne, {:process, self(), "abhinavpodduturi:", start, zeroes})
-    Actor.findKeys(pidTwo, {:process, self(), "abhinavpodduturi:", start+1, zeroes})
-    Actor.findKeys(pidThree, {:process, self(), "abhinavpodduturi:", start+2, zeroes})
-    Actor.findKeys(pidFour, {:process, self(), "abhinavpodduturi:", start+3, zeroes})
-    Actor.findKeys(pidFive, {:process, self(), "abhinavpodduturi:", start+4, zeroes})
-    Actor.findKeys(pidSix, {:process, self(), "abhinavpodduturi:", start+5, zeroes})
-    Actor.findKeys(pidSeven, {:process, self(), "abhinavpodduturi:", start+6, zeroes})
-    Actor.findKeys(pidEight, {:process, self(), "abhinavpodduturi:", start+7, zeroes})
-    
+  def startDistributor(start, limit, zeroes, num) when num == 0 do
     listen(start+8, limit, zeroes)
+  end
+
+  def startDistributor(start, limit, zeroes, num) do
+    {:ok, pidOne} = Actor.start_link()
+    Actor.findKeys(pidOne, {:process, self(), "abhinavpodduturi:", start, zeroes})
+    startDistributor(start+1, limit, zeroes, num-1)
   end
 end
 
 defmodule Server do  
   def getIPAdress(ipAddList) when ipAddList == [] do
-    ""
+    [head | tail] = ipAddList
+    {ip,_,_} = head
+    {one, two, three, four} = ip
+    Integer.to_string(one) <> "." <> Integer.to_string(two) <> "." 
+    <> Integer.to_string(three) <> "." <> Integer.to_string(four)
   end
 
   def getIPAdress(ipAddList) do
@@ -129,8 +121,8 @@ defmodule Server do
 
   def assignToNode(list, cur, zeroes) do
     [head | tail] = list
-    Node.spawn(head, Client, :startDistributor, [cur, cur+7, zeroes])
-    assignToNode(tail, cur+8, zeroes)
+    Node.spawn(head, Client, :startDistributor, [cur, cur+15, zeroes, 16])
+    assignToNode(tail, cur+16, zeroes)
   end
 
   def monitorNewConnections(cur, zeroes, list) do
@@ -148,8 +140,8 @@ defmodule Server do
       ipAddr = "server@" <> getIPAdress(ipAddList)
       Node.start(String.to_atom(ipAddr))
       Node.set_cookie(:"project1")
-      spawn(Client, :startDistributor, [1, 13, zeroes])
-      monitorNewConnections(14, zeroes, [])
+      spawn(Client, :startDistributor, [1, 20, zeroes, 16])
+      monitorNewConnections(21, zeroes, [])
   end
 end
 

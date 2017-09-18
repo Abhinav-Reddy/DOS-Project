@@ -84,7 +84,7 @@ defmodule Client do
   end
 
   def startDistributor(start, limit, zeroes, num) when num == 0 do
-    listen(start+8, limit, zeroes)
+    listen(start, limit, zeroes)
   end
 
   def startDistributor(start, limit, zeroes, num) do
@@ -115,24 +115,24 @@ defmodule Server do
     end
   end
 
-  def assignToNode(list, cur, zeroes) when list == [] do
+  def assignToNode(list, cur, zeroes, processCnt) when list == [] do
     cur
   end
 
-  def assignToNode(list, cur, zeroes) do
+  def assignToNode(list, cur, zeroes, processCnt) do
     [head | tail] = list
-    Node.spawn(head, Client, :startDistributor, [cur, cur+15, zeroes, 16])
-    assignToNode(tail, cur+16, zeroes)
+    Node.spawn(head, Client, :startDistributor, [cur, cur+processCnt-1, zeroes, processCnt])
+    assignToNode(tail, cur+processCnt, zeroes, processCnt)
   end
 
-  def monitorNewConnections(cur, zeroes, list) do
+  def monitorNewConnections(cur, zeroes, list, processCnt) do
     newList = Node.list()
     Enum.sort(newList)
     diffList = newList -- list
     list = newList
-    cur = assignToNode(diffList, cur, zeroes)
+    cur = assignToNode(diffList, cur, zeroes, processCnt)
     :timer.sleep(5000)
-    monitorNewConnections(cur, zeroes, list)
+    monitorNewConnections(cur, zeroes, list, processCnt)
   end
 
   def startServer(zeroes) do
@@ -140,8 +140,9 @@ defmodule Server do
       ipAddr = "server@" <> getIPAdress(ipAddList)
       Node.start(String.to_atom(ipAddr))
       Node.set_cookie(:"project1")
-      spawn(Client, :startDistributor, [1, 20, zeroes, 16])
-      monitorNewConnections(21, zeroes, [])
+      processCnt = 16
+      spawn(Client, :startDistributor, [1, processCnt+4, zeroes, processCnt])
+      monitorNewConnections(processCnt+5, zeroes, [], processCnt)
   end
 end
 

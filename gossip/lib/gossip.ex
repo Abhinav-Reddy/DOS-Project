@@ -1,25 +1,21 @@
 defmodule Actor do
-  use GenServer
+  # use GenServer
     
-  def start_link do
-    GenServer.start_link(__MODULE__, [])
-  end
+  # def start_link do
+  #   GenServer.start_link(__MODULE__, [])
+  # end
 
-  def handle_cast({neighbors, mainProcess, curPos}, state) do
-    receiveGossip(neighbors, mainProcess, curPos, 1, 0, self())
-    {:noreply, []}
-  end
-
-  def setNeighbors(pid, {neighbors, mainProcess, curPos}) do
-    GenServer.cast(pid, {neighbors, mainProcess, curPos})
-  end
-
-
+  # def handle_cast({neighbors, mainProcess, curPos}, state) do
+  #   receiveGossip(neighbors, mainProcess, curPos, 1, 0, self())
+  #   {:noreply, []}
+  # end
   def sendGossip(neighbors, mainProcess) do
     pid = GOSSIP.getRandom(neighbors, -1, 1)
-    send(pid, {:gossip})
+    send(pid, {:gossip, self()})
     send(mainProcess, {:sent})
+    :timer.sleep(2)
     sendGossip(neighbors, mainProcess)
+    
   end
 
   def sendFinalMessage(neighbors) when neighbors == [] do
@@ -35,14 +31,14 @@ defmodule Actor do
   def receiveGossip(neighbors, mainProcess, sum, weight, count, recPid) do
     
     receive do
-      {:push, s,w} ->
+      {:push, senderPid, s,w} ->
         {sum, weight, count} = 
           if (count < 3) do
             s = sum + s
             w = weight + w
             
             pid = GOSSIP.getRandom(neighbors, -1, 1)
-            send(pid, {:push, s/2, w/2})
+            send(pid, {:push, self(), s/2, w/2})
             send(mainProcess, {:sent})
             counter = if (abs(sum/weight - s/w) <= 0.0000000001) do
                         count + 1
@@ -51,33 +47,47 @@ defmodule Actor do
                       end
             {s, w, counter}
           else
-            {2*sum, 2*weight, count}
+            if (count == 3) do
+              sendFinalMessage(neighbors)
+            end
+            send(senderPid, {:bye, self()})
+            {2*sum, 2*weight, count+1}
           end
         IO.puts sum/weight
         receiveGossip(neighbors, mainProcess, sum/2, weight/2, count, recPid)
-      {:gossip} ->
+      {:gossip, senderPid} ->
         recPid = 
           if (count == 0) do
             spawn(Actor, :sendGossip, [neighbors, mainProcess])
           else
             recPid
           end
-        if (count == 9) do
+        if (count == 2) do
           Process.exit(recPid, :kill)
           sendFinalMessage(neighbors)
+        end
+        if (count > 2) do
+          send(senderPid, {:bye, self()})
         end
         IO.puts sum
         receiveGossip(neighbors, mainProcess, sum, weight, count+1, recPid)
       
       {:bye, pid} ->
         neighbors = neighbors -- [pid]
-        if (neighbors == []) do
+        if (neighbors == [] && recPid != self()) do
           Process.exit(recPid, :kill)
-        else
-          receiveGossip(neighbors, mainProcess, sum, weight, count, recPid)
         end
-
+        receiveGossip(neighbors, mainProcess, sum, weight, count, recPid)
+        
     end
+  end
+
+  def start() do
+    receive do
+      {neighbors, mainProcess, curPos} -> 
+          receiveGossip(neighbors, mainProcess, curPos, 1, 0, self())
+    end
+    
   end
 
 end
@@ -90,7 +100,7 @@ defmodule GOSSIP do
   end
 
   def createAgents(numNodes, pids) do
-    {:ok, pid} = Actor.start_link()
+    pid = spawn(Actor, :start, [])
     pids = pids ++ [pid]
     createAgents(numNodes-1, pids)
   end
@@ -103,7 +113,7 @@ defmodule GOSSIP do
   def createFullTopology(agents, remAgents, curPos) do
     [head | tail] = remAgents
     neighbors = agents -- [head]
-    Actor.setNeighbors(head, {neighbors, self(), curPos})
+    send(head, {neighbors, self(), curPos})
     IO.puts "Length"
     IO.puts length(neighbors)
     createFullTopology(agents, tail, curPos+1)
@@ -155,7 +165,7 @@ defmodule GOSSIP do
                   neighbors
                 end
 
-    Actor.setNeighbors(curNode, {neighbors, self(), cur+1})
+    send(curNode, {neighbors, self(), cur+1})
     create2D(agents, cur+1, numNodes)
   end
 
@@ -208,7 +218,7 @@ defmodule GOSSIP do
                 end
 
     neighbors = neighbors ++ [getNthNode(agents, getRandomForNode(x,y,sq))]
-    Actor.setNeighbors(curNode, {neighbors, self(), cur+1})
+    send(curNode, {neighbors, self(), cur+1})
     create2D(agents, cur+1, numNodes)
   end
 
@@ -227,7 +237,7 @@ defmodule GOSSIP do
     else
       [next | _] = tail
       neighbors = prev ++ [next]
-      Actor.setNeighbors(cur, {neighbors, self(), curPos})
+      send(cur, {neighbors, self(), curPos})
       createLine([cur], tail, curPos+1)
     end
   end
@@ -248,10 +258,6 @@ defmodule GOSSIP do
     getRandom(tail, cur, len+1)
   end
 
-  def receiveResponse(cur, limit) when cur >= limit-1 do
-    
-  end
-
   def receiveResponse() do
     
     receive do
@@ -261,6 +267,16 @@ defmodule GOSSIP do
     after
       1_000 -> IO.puts "Nothing"
     end
+  end
+
+  def killChildProcess(agents) when agents == [] do
+    
+  end
+
+  def killChildProcess(agents) do
+    [head | tail] = agents
+    Process.exit(head, :kill)
+    killChildProcess(tail)
   end
 
   def start(numNodes, topology, algorithm) do
@@ -281,11 +297,13 @@ defmodule GOSSIP do
     cur = :os.system_time(:millisecond)
     pid = getRandom(agents, -1, 1)
     if (algorithm == "gossip") do
-      send(pid, {:gossip})
+      send(pid, {:gossip, self()})
     else
-      send(pid, {:push, 0,0})  
+      send(pid, {:push, self(), 0,0})  
     end
     receiveResponse()
+    killChildProcess(agents)
+    IO.puts "Done"
     IO.puts (:os.system_time(:millisecond) - cur)
   end
 end

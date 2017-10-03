@@ -47,10 +47,10 @@ defmodule Actor do
                       end
             {s, w, counter}
           else
-            if (count == 3) do
-              sendFinalMessage(neighbors)
-            end
-            send(senderPid, {:bye, self()})
+            # if (count == 3) do
+            #   sendFinalMessage(neighbors)
+            # end
+            # send(senderPid, {:bye, self()})
             {2*sum, 2*weight, count+1}
           end
         IO.puts sum/weight
@@ -74,9 +74,15 @@ defmodule Actor do
       
       {:bye, pid} ->
         neighbors = neighbors -- [pid]
-        if (neighbors == [] && recPid != self()) do
+        recPid = if (recPid != self() && Process.alive?(recPid)) do
           Process.exit(recPid, :kill)
+          if (neighbors != []) do
+            spawn(Actor, :sendGossip, [neighbors, mainProcess])
+          end
+        else
+          recPid
         end
+
         receiveGossip(neighbors, mainProcess, sum, weight, count, recPid)
         
     end
@@ -120,7 +126,7 @@ defmodule GOSSIP do
   end
   
   def getNthNode(agentsList, cur) when cur == 0 do
-    [head | _] = agentsList
+    [head | tail] = agentsList
     head
   end
 
@@ -137,7 +143,10 @@ defmodule GOSSIP do
     curNode = getNthNode(agents, cur)
     neighbors = []
     sq = :math.sqrt(numNodes)
-    x = cur/sq
+    sq = round(sq)
+    x = div(cur, sq)
+    IO.puts cur
+    IO.puts sq
     y = rem(cur,sq)
     
     
@@ -190,7 +199,10 @@ defmodule GOSSIP do
     curNode = getNthNode(agents, cur)
     neighbors = []
     sq = :math.sqrt(numNodes)
-    x = cur/sq
+    sq = round(sq)
+    x = div(cur, sq)
+    IO.puts cur
+    IO.puts sq
     y = rem(cur,sq)
     
     neighbors = if (x+1 <  sq) do
@@ -230,16 +242,22 @@ defmodule GOSSIP do
     end
   end
 
+  
+  def createLine(prev, remAgents, curPos) when remAgents == [] do
+    
+  end
+
   def createLine(prev, remAgents, curPos) do
     [cur | tail] = remAgents
-    if tail == [] do
-      
-    else
-      [next | _] = tail
-      neighbors = prev ++ [next]
+    next = if tail == [] do
+              []
+           else 
+              [tmpNext | _] = tail
+              [tmpNext]
+           end
+      neighbors = prev ++ next
       send(cur, {neighbors, self(), curPos})
       createLine([cur], tail, curPos+1)
-    end
   end
 
 

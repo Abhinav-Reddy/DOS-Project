@@ -1,3 +1,14 @@
+defmodule Bucket do
+  use Agent
+
+  def start_link(opts) do
+    Agent.start_link(fn -> opts end)
+  end
+
+end
+
+
+
 defmodule Actor do
   # use GenServer
     
@@ -9,89 +20,103 @@ defmodule Actor do
   #   receiveGossip(neighbors, mainProcess, curPos, 1, 0, self())
   #   {:noreply, []}
   # end
-  def sendGossip(neighbors, mainProcess) do
-    pid = GOSSIP.getRandom(neighbors, -1, 1)
-    send(pid, {:gossip, self()})
-    send(mainProcess, {:sent})
-    :timer.sleep(2)
-    sendGossip(neighbors, mainProcess)
+  # def sendFinalMessage(neighbors) when neighbors == [] do
     
+  # end
+
+  # def sendFinalMessage(neighbors) do
+  #   [head | tail] = neighbors
+  #   send(head, {:bye, self()})
+  #   sendFinalMessage(tail)
+  # end
+  
+  def sendGossip(bucket, mainProcess, parent) do
+    {s, w, neighbors} = Agent.get(bucket, fn state -> state end)
+    if (neighbors != []) do
+      pid = GOSSIP.getRandom(neighbors, -1, 1)
+      send(pid, {:gossip, parent})
+      send(mainProcess, {:sent})
+      :timer.sleep(5)
+      sendGossip(bucket, mainProcess, parent)
+    end
   end
 
-  def sendFinalMessage(neighbors) when neighbors == [] do
-    
+  def sendPushMessage(bucket, mainProcess, parent) do
+    {s, w, neighbors} = Agent.get(bucket, fn state -> state end)
+    if (neighbors != []) do
+      Agent.update(bucket, fn state -> {sum, wei, neigh} = state
+                                      {sum - s/2, wei - w/2, neigh} end)
+      pid = GOSSIP.getRandom(neighbors, -1, 1)
+      send(pid, {:push, parent, s/2, w/2})
+      send(mainProcess, {:sent})
+      :timer.sleep(5)
+      sendPushMessage(bucket, mainProcess, parent)
+    end
   end
 
-  def sendFinalMessage(neighbors) do
-    [head | tail] = neighbors
-    send(head, {:bye, self()})
-    sendFinalMessage(tail)
-  end
-
-  def receiveGossip(neighbors, mainProcess, sum, weight, count, recPid) do
+  def receiveGossip(bucket, mainProcess, count, isFirst) do
     
     receive do
       {:push, senderPid, s,w} ->
-        {sum, weight, count} = 
-          if (count < 3) do
-            s = sum + s
-            w = weight + w
-            
-            pid = GOSSIP.getRandom(neighbors, -1, 1)
-            send(pid, {:push, self(), s/2, w/2})
-            send(mainProcess, {:sent})
-            counter = if (abs(sum/weight - s/w) <= 0.0000000001) do
-                        count + 1
-                      else
-                        0
-                      end
-            {s, w, counter}
-          else
-            # if (count == 3) do
-            #   sendFinalMessage(neighbors)
-            # end
-            # send(senderPid, {:bye, self()})
-            {2*sum, 2*weight, count+1}
-          end
+          {sum, weight, neighbors} = Agent.get(bucket, fn state -> state end)
+          Agent.update(bucket, fn state -> {sm, wei, neigh} = state
+                                      {sm + s, wei + w, neigh} end)
+          isFirst = if (isFirst == 1) do
+              spawn(Actor, :sendPushMessage, [bucket, mainProcess, self()])
+              0
+            else
+              isFirst
+            end
+          s = sum + s
+          w = weight + w
+          
+          count = if (count < 3) do    
+                    counter = if (abs(sum/weight - s/w) <= 0.0000000001) do
+                                count + 1
+                              else
+                                0
+                              end
+                    counter
+                  else
+                    if (neighbors != []) do
+                      Agent.update(bucket, fn state -> {sum, weight, neigh} = state
+                                                       {sum, weight, []} end)
+                      count
+                    end
+                    send(senderPid, {:bye, self()})
+                  end
         IO.puts sum/weight
-        receiveGossip(neighbors, mainProcess, sum/2, weight/2, count, recPid)
+        receiveGossip(bucket, mainProcess, count, isFirst)
+      
       {:gossip, senderPid} ->
-        recPid = 
-          if (count == 0) do
-            spawn(Actor, :sendGossip, [neighbors, mainProcess])
-          else
-            recPid
-          end
-        if (count == 2) do
-          Process.exit(recPid, :kill)
-          sendFinalMessage(neighbors)
+        {sum, weight, neighbors} = Agent.get(bucket, fn state -> state end)
+        if (count == 0) do
+          spawn(Actor, :sendGossip, [bucket, mainProcess, self()])
         end
-        if (count > 2) do
+        if (count >= 2) do
+          if (neighbors != []) do
+            Agent.update(bucket, fn _state -> {sum, weight, []} end)
+            {_, _, tmpNeigh} = Agent.get(bucket, fn state -> state end)
+          end
           send(senderPid, {:bye, self()})
         end
         IO.puts sum
-        receiveGossip(neighbors, mainProcess, sum, weight, count+1, recPid)
+        receiveGossip(bucket, mainProcess, count+1, isFirst)
       
       {:bye, pid} ->
-        neighbors = neighbors -- [pid]
-        recPid = if (recPid != self() && Process.alive?(recPid)) do
-          Process.exit(recPid, :kill)
-          if (neighbors != []) do
-            spawn(Actor, :sendGossip, [neighbors, mainProcess])
-          end
-        else
-          recPid
-        end
-
-        receiveGossip(neighbors, mainProcess, sum, weight, count, recPid)
+        {sum, weight, neigh} = Agent.get(bucket, fn state -> state end)
+        Agent.update(bucket, fn state ->  {sum, weight, neigh -- [pid]} end)
+        {sum, weight, neigh} = Agent.get(bucket, fn state -> state end)
+        receiveGossip(bucket, mainProcess, count, isFirst)
         
     end
   end
 
   def start() do
     receive do
-      {neighbors, mainProcess, curPos} -> 
-          receiveGossip(neighbors, mainProcess, curPos, 1, 0, self())
+      {neighbors, mainProcess, curPos} ->
+          {:ok, bucket} = Bucket.start_link({curPos, 1, neighbors}) 
+          receiveGossip(bucket, mainProcess, 0, 1)
     end
     
   end

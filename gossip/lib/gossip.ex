@@ -14,7 +14,7 @@ defmodule Actor do
   def sendGossip(neighbors) do
     pid = GOSSIP.getRandom(neighbors, -1, 1)
     send(pid, {:gossip})
-    :timer.sleep(5)
+    :timer.sleep(1)
     sendGossip(neighbors)
   end
 
@@ -24,7 +24,7 @@ defmodule Actor do
                                       {sum - s/2, wei - w/2} end)
     pid = GOSSIP.getRandom(neighbors, -1, 1)
     send(pid, {:push, s/2, w/2})
-    :timer.sleep(5)
+    :timer.sleep(1)
     sendPushMessage(bucket, neighbors)
   end
 
@@ -35,11 +35,11 @@ defmodule Actor do
         {sum, weight} = Agent.get(bucket, fn state -> state end)
         Agent.update(bucket, fn state -> {sm, wei} = state
                                     {sm + s, wei + w} end)
-        isFirst = if (isFirst == 1) do
-            senderThread = spawn(Actor, :sendPushMessage, [bucket, neighbors])
-            0
+        {isFirst, senderThread} = if (isFirst == 1) do
+            tmpSenderThread = spawn(Actor, :sendPushMessage, [bucket, neighbors])
+            {0, tmpSenderThread}
           else
-            isFirst
+            {isFirst, senderThread}
           end
         s = sum + s
         w = weight + w
@@ -71,7 +71,7 @@ defmodule Actor do
         {sum, _} = Agent.get(bucket, fn state -> state end)
         #IO.puts sum
         
-        if (count == 2) do
+        if (count == 10) do
           Process.exit(senderThread, :kill)
         end
         
@@ -82,7 +82,7 @@ defmodule Actor do
           Process.exit(senderThread, :kill)
         end
         {sum, weight} = Agent.get(bucket, fn state -> state end)
-        IO.puts "Done with thread " <> to_string(sum/weight)
+        #IO.puts "Done with thread " <> to_string(sum/weight)
         Process.exit(bucket, :kill)
     end
   end
@@ -301,10 +301,21 @@ defmodule GOSSIP do
     end
   end
 
+  def sendToAll(agents) when agents == [] do
+    
+  end
+
+  def sendToAll(agents) do
+    [head | tail] = agents
+    send(head, {:push, 0, 0})
+    sendToAll(tail)
+  end
+
   def receiveDuplicateKills() do
     receive do
       {_} -> receiveDuplicateKills();
     after 5_00 -> 
+
     end
   end
 
@@ -317,25 +328,48 @@ defmodule GOSSIP do
 
     agents = createAgents(numNodes, [])
     case topology do
-      "Full" -> createFullTopology(agents, agents, 1)
+      "full" -> createFullTopology(agents, agents, 1)
       "2D" -> create2D(agents,  0, numNodes)
       "line" -> createLine( [], agents, 1)
       "imp2D" -> createImp2D(agents, 0, numNodes)
     end
-    IO.puts "Start Gossip"
+    #IO.puts "Start Gossip"
     cur = :os.system_time(:millisecond)
-    pid = getRandom(agents, -1, 1)
     if (algorithm == "gossip") do
+      pid = getRandom(agents, -1, 1)
       send(pid, {:gossip})
     else
-      send(pid, {:push, 0,0})  
+      sendToAll(agents)  
     end
     receiveResponse(0, numNodes, agents)
     #flush()
     cur = :os.system_time(:millisecond) - cur
-    :timer.sleep(200)
     receiveDuplicateKills()
-    IO.puts "Done"
-    IO.puts (cur)
+    #IO.puts "Done"
+    cur
+    
   end
+
+  def startTestFor(_,_, cur, limit) when cur > limit do
+    
+  end
+
+  def startTestFor(topology, algorithm, cur, limit) do
+    res = start(cur, topology, algorithm)
+    IO.puts to_string(cur) <> " " <> topology <> " " <> algorithm <> " " <> to_string(res)
+    startTestFor(topology, algorithm, 2*cur, limit)
+  end
+
+  def startTest() do
+    startTestFor("full", "gossip", 2, 4096)
+    startTestFor("full", "push-sum", 2, 4096)
+    startTestFor("2D", "gossip", 2, 4096)
+    startTestFor("2D", "push-sum", 2, 4096)
+    startTestFor("imp2D", "gossip", 2, 4096)
+    startTestFor("imp2D", "push-sum", 2, 4096)
+    startTestFor("line", "gossip", 2, 4096)
+    startTestFor("line", "push-sum", 2, 4096)
+
+  end
+
 end

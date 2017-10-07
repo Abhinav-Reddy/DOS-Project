@@ -11,22 +11,44 @@ end
 
 defmodule Actor do
   
-  def sendGossip(neighbors, count) do
-    pid = GOSSIP.getRandom(neighbors, -1, 1)
-    send(pid, {:gossip})
-    #if (count >= length())
-    :timer.sleep(1)
-    sendGossip(neighbors)
+  def sendGossip(neighbors, reserve, len) when neighbors == [] do
+    sendGossip(reserve, reserve, len)
   end
 
-  def sendPushMessage(bucket, neighbors) do
+  def sendGossip(neighbors, reserve, len) do
+    if (len >= 6) do
+      [pid | tail] = neighbors
+      send(pid, {:gossip})
+      :timer.sleep(1)
+      sendGossip(tail, reserve, len)
+    else
+      pid = GOSSIP.getRandom(neighbors)
+      send(pid, {:gossip})
+      :timer.sleep(1)
+      sendGossip(neighbors, reserve, len)
+    end
+  end
+
+  def sendPushMessage(bucket, neighbors, reserve, len) when neighbors == [] do
+    #IO.puts "Panic"
+    sendPushMessage(bucket, reserve, reserve, len)
+  end
+
+  def sendPushMessage(bucket, neighbors, reserve, len) do
     {s, w} = Agent.get(bucket, fn state -> state end)
     Agent.update(bucket, fn state -> {sum, wei} = state
                                       {sum - s/2, wei - w/2} end)
-    pid = GOSSIP.getRandom(neighbors, -1, 1)
-    send(pid, {:push, s/2, w/2})
-    :timer.sleep(1)
-    sendPushMessage(bucket, neighbors)
+    if (len >= 6) do
+      [pid | tail] = neighbors
+      send(pid, {:push, s/2, w/2})
+      :timer.sleep(1)
+      sendPushMessage(bucket, tail, reserve, len)
+    else
+      pid = GOSSIP.getRandom(neighbors)
+      send(pid, {:push, s/2, w/2})
+      :timer.sleep(1)
+      sendPushMessage(bucket, neighbors, reserve, len)
+    end 
   end
 
   def receiveGossip(bucket, mainProcess, count, isFirst, neighbors, senderThread) do
@@ -37,7 +59,7 @@ defmodule Actor do
         Agent.update(bucket, fn state -> {sm, wei} = state
                                     {sm + s, wei + w} end)
         {isFirst, senderThread} = if (isFirst == 1) do
-            tmpSenderThread = spawn(Actor, :sendPushMessage, [bucket, neighbors])
+            tmpSenderThread = spawn(Actor, :sendPushMessage, [bucket, neighbors, neighbors, length(neighbors)])
             {0, tmpSenderThread}
           else
             {isFirst, senderThread}
@@ -64,7 +86,7 @@ defmodule Actor do
       {:gossip} ->
         senderThread =  if (count == 0) do
                           send(mainProcess, {:receivedFirst})
-                          spawn(Actor, :sendGossip, [neighbors])
+                          spawn(Actor, :sendGossip, [neighbors, neighbors, length(neighbors)])
                         else
                           senderThread
                         end
@@ -136,10 +158,10 @@ defmodule GOSSIP do
 
   def createFullTopology(mapAgents, agents, remAgents, curPos) do
     [head | tail] = remAgents
-    neighbors = if (map_size(mapAgents) > 200) do
-                        reorderNeighbors(mapAgents, round(:math.sqrt(map_size(mapAgents)))+1, [], head, map_size(mapAgents))
+    neighbors = if (map_size(mapAgents) > 256) do
+                        reorderNeighbors(mapAgents, 4*round(:math.sqrt(map_size(mapAgents))) , [], head, map_size(mapAgents))
                       else
-                        agents -- [head]
+                        reorderNeighbors(mapAgents, 256 , [], head, map_size(mapAgents))
                       end
     send(head, {neighbors, self(), curPos})
     #IO.puts "Length"
@@ -283,7 +305,7 @@ defmodule GOSSIP do
   end
 
 
-  def getRandom(nodes, cur, len) do
+  def getRandom(nodes) do
     
     tmp = :rand.uniform(length(nodes))
     Enum.at(nodes, tmp-1)
@@ -361,7 +383,7 @@ defmodule GOSSIP do
     #IO.puts "Start Gossip"
     cur = :os.system_time(:millisecond)
     if (algorithm == "gossip") do
-      pid = getRandom(agents, -1, 1)
+      pid = getRandom(agents)
       send(pid, {:gossip})
     else
       sendToAll(agents)  

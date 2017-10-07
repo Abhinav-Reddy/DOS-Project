@@ -380,7 +380,7 @@ defmodule GOSSIP do
       "line" -> createLine( [], agents, 1)
       "imp2D" -> createImp2D(agents, 0, numNodes)
     end
-    #IO.puts "Start Gossip"
+    # IO.puts "Start Gossip"
     cur = :os.system_time(:millisecond)
     if (algorithm == "gossip") do
       pid = getRandom(agents)
@@ -408,15 +408,34 @@ defmodule GOSSIP do
   end
 
   def startTest() do
-    startTestFor("full", "gossip", 2, 4096)
-    startTestFor("full", "push-sum", 2, 4096)
-    startTestFor("2D", "gossip", 2, 4096)
-    startTestFor("2D", "push-sum", 2, 4096)
-    startTestFor("imp2D", "gossip", 2, 4096)
-    startTestFor("imp2D", "push-sum", 2, 4096)
-    startTestFor("line", "gossip", 2, 4096)
-    startTestFor("line", "push-sum", 2, 4096)
+    limit = 32768
+    startTestFor("full", "gossip", 2, limit)
+    startTestFor("full", "push-sum", 2, limit)
+    startTestFor("2D", "gossip", 2, limit)
+    startTestFor("2D", "push-sum", 2, limit)
+    startTestFor("imp2D", "gossip", 2, limit)
+    startTestFor("imp2D", "push-sum", 2, limit)
+    startTestFor("line", "gossip", 2, limit)
+    startTestFor("line", "push-sum", 2, limit)
 
   end
 
+end
+
+defmodule Project2 do
+  def main([]) do
+    IO.puts "Enter Valid Number of Arguments"
+  end
+
+  def main(argv) do
+    # node_num = Enum.at(argv,0)
+    {node_num, _} = Integer.parse(Enum.at(argv,0))
+    # IO.puts node_num
+    topology = Enum.at(argv,1)
+    # IO.puts topology
+    algorithm = Enum.at(argv,2)
+    # IO.puts algorithm
+    # IO.puts "Starting Gossip"
+    IO.puts GOSSIP.start(node_num, topology, algorithm)
+  end
 end

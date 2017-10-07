@@ -11,9 +11,10 @@ end
 
 defmodule Actor do
   
-  def sendGossip(neighbors) do
+  def sendGossip(neighbors, count) do
     pid = GOSSIP.getRandom(neighbors, -1, 1)
     send(pid, {:gossip})
+    #if (count >= length())
     :timer.sleep(1)
     sendGossip(neighbors)
   end
@@ -87,6 +88,7 @@ defmodule Actor do
     end
   end
 
+
   def start() do
     receive do
       {neighbors, mainProcess, curPos} ->
@@ -101,28 +103,48 @@ end
 
 defmodule GOSSIP do
 
+  
   def createAgents(numNodes, pids) when numNodes == 0 do
     pids
   end
 
   def createAgents(numNodes, pids) do
     pid = spawn(Actor, :start, [])
-    pids = pids ++ [pid]
+    pids = [pid | pids]
     createAgents(numNodes-1, pids)
   end
 
-  
-  def createFullTopology(agents, remAgents, curPos) when remAgents == [] do
-
+  def reorderNeighbors(neighbors, cur, newList, head, len) when cur == 0 do
+    newList
   end
 
-  def createFullTopology(agents, remAgents, curPos) do
+  def reorderNeighbors(neighbors, cur, newList, head, len) do
+    tmp = :rand.uniform(len)
+    tmp = Map.get(neighbors, tmp-1)
+    if (tmp != head) do
+      reorderNeighbors(neighbors, cur-1, [tmp | newList], head, len)
+    else
+      reorderNeighbors(neighbors, cur, newList, head, len)
+    end
+  end
+
+
+  def createFullTopology(mapAgents, agents, remAgents, curPos) when remAgents == [] do
+
+  end
+  
+
+  def createFullTopology(mapAgents, agents, remAgents, curPos) do
     [head | tail] = remAgents
-    neighbors = agents -- [head]
+    neighbors = if (map_size(mapAgents) > 200) do
+                        reorderNeighbors(mapAgents, round(:math.sqrt(map_size(mapAgents)))+1, [], head, map_size(mapAgents))
+                      else
+                        agents -- [head]
+                      end
     send(head, {neighbors, self(), curPos})
     #IO.puts "Length"
     #IO.puts length(neighbors)
-    createFullTopology(agents, tail, curPos+1)
+    createFullTopology(mapAgents, agents, tail, curPos+1)
   end
   
   def getNthNode(agentsList, cur) when cur == 0 do
@@ -261,19 +283,11 @@ defmodule GOSSIP do
   end
 
 
-  def getRandom(nodes, cur, len) when nodes == [] do
-    cur
-  end
-
   def getRandom(nodes, cur, len) do
     
-    [head | tail] = nodes
-    cur = if (:rand.uniform(len) == len) do
-            head
-          else 
-            cur
-          end
-    getRandom(tail, cur, len+1)
+    tmp = :rand.uniform(length(nodes))
+    Enum.at(nodes, tmp-1)
+
   end
 
   def killChildProcess(agents) when agents == [] do
@@ -293,7 +307,7 @@ defmodule GOSSIP do
         killChildProcess(agents)
       {:receivedFirst} ->
         counter = counter + 1
-        if (10*counter >= 9*numNodes) do
+        if (100*counter >= 95*numNodes) do
           killChildProcess(agents)
         else
           receiveResponse(counter, numNodes, agents)
@@ -319,6 +333,17 @@ defmodule GOSSIP do
     end
   end
 
+  
+  def getMappedAgents(agents, res, cur) when agents == [] do
+    res
+  end
+
+  def getMappedAgents(agents, res, cur) do
+    [head | tail] = agents
+    res = Map.put(res, cur, head)
+    getMappedAgents(tail, res, cur+1)
+  end
+
   def start(numNodes, topology, algorithm) do
     numNodes = if (topology == "2D" || topology == "imp2D") do
                   getNearestSquare(1, numNodes)
@@ -328,7 +353,7 @@ defmodule GOSSIP do
 
     agents = createAgents(numNodes, [])
     case topology do
-      "full" -> createFullTopology(agents, agents, 1)
+      "full" -> createFullTopology(getMappedAgents(agents, %{}, 0), agents, agents, 1)
       "2D" -> create2D(agents,  0, numNodes)
       "line" -> createLine( [], agents, 1)
       "imp2D" -> createImp2D(agents, 0, numNodes)

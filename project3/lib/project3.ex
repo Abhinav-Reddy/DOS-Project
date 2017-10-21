@@ -92,8 +92,9 @@ defmodule Actor do
     getNearestFromRemLeafs(tl(leafs), key, diff, nearest)
   end
 
+
   def compareIds(one, two, index) do
-    if (String.at(one, index) == String.at(two, index)) do
+    if (index < String.length(one) && String.at(one, index) == String.at(two, index)) do
       compareIds(one, two, index+1)
     else
       index
@@ -159,31 +160,66 @@ defmodule Actor do
     end
   end
 
+  def getNextHop(key, routeTable, leftLeafs, rightLeafs, curNodeId, endCount) do
+    nextHop = if (curNodeId == key) do
+                self()
+              else
+                :null
+              end
+    nextHop = if (nextHop == :null) do
+                checkInRange(leftLeafs, [{self(), curNodeId} | rightLeafs], key)
+              else
+                nextHop
+              end
+
+    nextHop = if (nextHop == :null) do
+                tmpVal = String.to_integer( String.at(key, endCount), 16 )
+                Enum.at(Enum.at(routeTable, endCount), tmpVal)
+              else
+                nextHop
+              end
+    nextHop = if (nextHop == :null) do
+                getNearestFromLeafs(leftLeafs ++ rightLeafs ++ [{self(), curNodeId}], 
+                  String.to_integer(key, 16))
+              else
+                nextHop
+              end
+    #IO.inspect(nextHop)
+    nextHop
+  end
+
+  def getRandomKey(nodeList, parent) do
+    tmp = :rand.uniform(length(nodeList))
+    {pid, key} = Enum.at(nodeList, tmp-1)
+    if (pid == parent) do
+      getRandomKey(nodeList, parent)
+    else
+      key
+    end
+  end
+  
+  def sendrequests(numRequests, _, _) when numRequests == 0 do
+    
+  end
+
+  
+
+  def sendrequests(numRequests, nodeList, parentPid) do
+    key = getRandomKey(nodeList, parentPid)
+    #IO.puts "Sending key "<>key<>" to "
+    #IO.inspect(parentPid)
+    send(parentPid, {:message, key, 0, 0})
+    :timer.sleep(1000)
+    sendrequests(numRequests-1, nodeList, parentPid)
+  end
+
   def receiveLoop(routeTable, leftLeafs, rightLeafs, curNodeId, master) do
     receive do
       {:newNode, startIndex, key, pid} ->
         #IO.puts "new node " <> curNodeId <> " " <> key
         endCount = compareIds(key, curNodeId, startIndex)
         send(pid, {:routeTable, Enum.slice(routeTable, 0, endCount+1), self(), curNodeId})
-        nextHop = checkInRange(leftLeafs, [{self(), curNodeId} | rightLeafs], key)
-        nextHop = if (nextHop == :null && curNodeId == key) do
-                    self()
-                  else
-                    :null
-                  end
-
-        nextHop = if (nextHop == :null) do
-                    tmpVal = String.to_integer( String.at(key, endCount), 16 )
-                    Enum.at(Enum.at(routeTable, endCount), tmpVal)
-                  else
-                    nextHop
-                  end
-        nextHop = if (nextHop == :null) do
-                    getNearestFromLeafs(leftLeafs ++ rightLeafs ++ [{self(), curNodeId}], 
-                      String.to_integer(key, 16))
-                  else
-                    nextHop
-                  end
+        nextHop = getNextHop(key, routeTable, leftLeafs, rightLeafs, curNodeId, endCount)
         if (nextHop == self()) do
           send(pid, {:leafNodes, leftLeafs, rightLeafs, {self(), curNodeId}})
         else
@@ -196,8 +232,25 @@ defmodule Actor do
         {leftLeafs, rightLeafs} = addLeafNode(leftLeafs, rightLeafs, senderPid, senderNodeId, curNodeId)
         #IO.puts "route " <> curNodeId <> " " <> senderNodeId <> " " <> to_string(length(sourceRouteTable))
         #IO.inspect(leftLeafs)
-        #IO.inspect(rightLeafs)
+        #IO.inspect(rightLeafs)1
         #IO.inspect(routeTable)
+        receiveLoop(routeTable, leftLeafs, rightLeafs, curNodeId, master)
+      {:startReq, numRequests, nodeList} ->
+        #IO.puts "Starting " <> curNodeId
+        #IO.inspect(nodeList)
+        spawn(Actor, :sendrequests, [numRequests ,nodeList, self()])
+        receiveLoop(routeTable, leftLeafs, rightLeafs, curNodeId, master)
+      {:message, key, hopCount, startIndex} ->
+        #IO.puts "Received "<>key<>" to "<>curNodeId
+
+        endCount = compareIds(key, curNodeId, startIndex)
+        nextHop = getNextHop(key, routeTable, leftLeafs, rightLeafs, curNodeId, endCount)
+        if (nextHop == self()) do
+          #IO.puts "sending hopcount"
+          send(master, {:hopcount, hopCount})
+        else
+          send(nextHop, {:message, key, hopCount+1, endCount})
+        end
         receiveLoop(routeTable, leftLeafs, rightLeafs, curNodeId, master)
     end
   end
@@ -253,7 +306,8 @@ defmodule Actor do
     #IO.inspect(routeTable)
     {routeTable, leftLeafs, rightLeafs, receivedFrom} = 
       if (startNode != []) do
-        send(hd(startNode), {:newNode, 0, nodeId, self()})
+        {startNodePid, _} = hd(startNode)
+        send(startNodePid, {:newNode, 0, nodeId, self()})
         receiveRouteInfo(routeTable, nodeId, [])
       else
         {routeTable, [], [], []}
@@ -264,7 +318,7 @@ defmodule Actor do
     receivedFrom = Enum.uniq(receivedFrom ++ leftLeafs ++ rightLeafs)
     sendRouteTable(routeTable, receivedFrom, nodeId)
     #:timer.sleep(1)
-    send(master, {:done})
+    send(master, {:done, nodeId})
     receiveLoop(routeTable, leftLeafs, rightLeafs, nodeId, master)  
   end
 
@@ -275,7 +329,7 @@ defmodule PASTRY do
 
   def receiveConfirmation() do
     receive do
-      {:done} -> :done
+      {:done, key} -> key
     end
   end
 
@@ -290,14 +344,39 @@ defmodule PASTRY do
           else
             spawn(Actor, :start, [[], numNodes, self()])
           end
-    nodes = [pid | nodes]
-    receiveConfirmation()
+    key = receiveConfirmation()
+    nodes = [{pid, key} | nodes]
     createNodes(numNodes-1, nodes)
+  end
+
+  def sendStartMessage(_, _, remList) when remList == [] do
+    
+  end
+
+  def sendStartMessage(nodeList, numRequests, remList) do
+    {pid,_} = hd(remList)
+    send(pid, {:startReq, numRequests, Enum.slice(nodeList,0,100)})
+    #:timer.sleep(3000)
+    sendStartMessage(nodeList, numRequests, tl(remList))
+  end
+
+  def receiveLoop(rem, sum) when rem == 0 do
+    sum
+  end
+
+  def receiveLoop(rem, sum) do
+    receive do
+      {:hopcount, count} ->
+        #IO.puts sum
+        receiveLoop(rem-1, sum+count)
+    end
   end
 
   def start(numNodes, numRequests) do
     nodes = createNodes(numNodes, [])
-    
+    spawn(PASTRY, :sendStartMessage, [nodes, numRequests, nodes])
+    tmp = numRequests*numNodes
+    receiveLoop(tmp, 0)/tmp
   end
   
 end

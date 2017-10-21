@@ -14,8 +14,8 @@ defmodule Actor do
     updateRow(tl(destination), tl(source), [tmp | res])
   end
 
-  def updateRouteTable(routeTable, _, _, _, idx) 
-    when idx >= length(routeTable)-1 do
+  def updateRouteTable(routeTable, sourceRouteTable, _, _, idx) 
+    when idx >= length(sourceRouteTable) do
       routeTable
   end
 
@@ -55,8 +55,7 @@ defmodule Actor do
   def receiveRouteInfo(routeTable, nodeId, receivedFrom) do
     receive do
       {:leafNodes, left, right, pivot} ->
-        {sourcePid, sourceKey} = pivot
-        receivedFrom = [sourcePid | receivedFrom]
+        receivedFrom = [pivot | receivedFrom]
         {leftLeafs, rightLeafs} = processLeafNodes(left, right, pivot, nodeId)
         #IO.puts "Received leaf nodes from " <> sourceKey
         {routeTable, leftLeafs, rightLeafs, receivedFrom}
@@ -64,8 +63,8 @@ defmodule Actor do
 
       {:routeTable, sourceRouteTable, sourcePid, sourceKey} ->
         routeTable = updateRouteTable(routeTable, sourceRouteTable, nodeId, sourceKey, 0)
-        receivedFrom = [ sourcePid | receivedFrom]
-        #IO.puts "Received route from " <> sourceKey
+        receivedFrom = [ {sourcePid, sourceKey} | receivedFrom]
+        #IO.puts "Received route from " <> sourceKey <> " " <> to_string(length(sourceRouteTable))
         receiveRouteInfo(routeTable, nodeId, receivedFrom)
     end
   end
@@ -165,7 +164,7 @@ defmodule Actor do
       {:newNode, startIndex, key, pid} ->
         #IO.puts "new node " <> curNodeId <> " " <> key
         endCount = compareIds(key, curNodeId, startIndex)
-        send(pid, {:routeTable, routeTable, self(), curNodeId})
+        send(pid, {:routeTable, Enum.slice(routeTable, 0, endCount+1), self(), curNodeId})
         nextHop = checkInRange(leftLeafs, [{self(), curNodeId} | rightLeafs], key)
         nextHop = if (nextHop == :null && curNodeId == key) do
                     self()
@@ -195,7 +194,7 @@ defmodule Actor do
         routeTable = 
           updateRouteTable(routeTable, sourceRouteTable, curNodeId, senderNodeId, 0)
         {leftLeafs, rightLeafs} = addLeafNode(leftLeafs, rightLeafs, senderPid, senderNodeId, curNodeId)
-        #IO.puts "route " <> curNodeId <> " " <> senderNodeId
+        #IO.puts "route " <> curNodeId <> " " <> senderNodeId <> " " <> to_string(length(sourceRouteTable))
         #IO.inspect(leftLeafs)
         #IO.inspect(rightLeafs)
         #IO.inspect(routeTable)
@@ -216,7 +215,7 @@ defmodule Actor do
     end
   end
 
-  def initRouteTable(routeTable, len, nodeId)  when len == 0 do
+  def initRouteTable(routeTable, len, _)  when len == 0 do
     routeTable
   end
 
@@ -228,24 +227,17 @@ defmodule Actor do
     
   end
 
-  def sendRouteTableToLeafs(sendList, res) when sendList == [] do
-    res
-  end
-
-  def sendRouteTableToLeafs(sendList, res) do
-  #IO.puts length(sendList)
-    [head | tail] = sendList
-    {pid, _} = head
-    sendRouteTableToLeafs(tail, [pid | res])
-  end
-
   def sendRouteTable(_, sendList, _) when sendList == [] do
     
   end
 
   def sendRouteTable(routeTable, sendList, nodeId) do
-    [pid | tail] = sendList
-    send(pid, {:routeTable, routeTable, self(), nodeId})
+    [head | tail] = sendList
+    {pid, tmpId} = head
+    #IO.puts nodeId
+    #IO.puts tmpId
+    endCount = compareIds(nodeId, tmpId, 0)
+    send(pid, {:routeTable, Enum.slice(routeTable, 0, endCount+1), self(), nodeId})
     #:timer.sleep(200)
     sendRouteTable(routeTable, tail, nodeId)
   end
@@ -269,9 +261,9 @@ defmodule Actor do
     #IO.inspect(routeTable)
     #IO.inspect(leftLeafs)
     #IO.inspect(rightLeafs)
-    receivedFrom = Enum.uniq(receivedFrom ++ sendRouteTableToLeafs(leftLeafs ++ rightLeafs, []))
+    receivedFrom = Enum.uniq(receivedFrom ++ leftLeafs ++ rightLeafs)
     sendRouteTable(routeTable, receivedFrom, nodeId)
-    :timer.sleep(20)
+    #:timer.sleep(1)
     send(master, {:done})
     receiveLoop(routeTable, leftLeafs, rightLeafs, nodeId, master)  
   end

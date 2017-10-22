@@ -58,7 +58,9 @@ defmodule Actor do
         receivedFrom = [pivot | receivedFrom]
         {leftLeafs, rightLeafs} = processLeafNodes(left, right, pivot, nodeId)
         #IO.puts "Received leaf nodes from " <> sourceKey
+        newLeafs(leftLeafs ++ rightLeafs)
         {routeTable, leftLeafs, rightLeafs, receivedFrom}
+        
         
 
       {:routeTable, sourceRouteTable, sourcePid, sourceKey} ->
@@ -187,30 +189,30 @@ defmodule Actor do
     #IO.inspect(nextHop)
     nextHop
   end
-
-  def getRandomKey(nodeList, parent) do
-    tmp = :rand.uniform(length(nodeList))
-    {pid, key} = Enum.at(nodeList, tmp-1)
-    if (pid == parent) do
-      getRandomKey(nodeList, parent)
-    else
-      key
-    end
-  end
   
-  def sendrequests(numRequests, _, _) when numRequests == 0 do
+  def sendrequests(numRequests, _) when numRequests == 0 do
     
   end
 
-  
-
-  def sendrequests(numRequests, nodeList, parentPid) do
-    key = getRandomKey(nodeList, parentPid)
-    #IO.puts "Sending key "<>key<>" to "
-    #IO.inspect(parentPid)
+  def sendrequests(numRequests, parentPid) do
+    tmp = :rand.uniform(100000000000000000000)
+    nodeId = Base.encode16(:crypto.hash(:sha256, to_string(tmp)))
+    key = String.slice(nodeId, 2..33)
     send(parentPid, {:message, key, 0, 0})
     :timer.sleep(1000)
-    sendrequests(numRequests-1, nodeList, parentPid)
+    sendrequests(numRequests-1, parentPid)
+  end
+
+  def forward(msg, nextId) do
+    send(nextId, msg)
+  end
+
+  def deliver(master, hopCount) do
+    send(master, {:hopcount, hopCount})
+  end
+
+  def newLeafs(_) do
+
   end
 
   def receiveLoop(routeTable, leftLeafs, rightLeafs, curNodeId, master) do
@@ -223,22 +225,24 @@ defmodule Actor do
         if (nextHop == self()) do
           send(pid, {:leafNodes, leftLeafs, rightLeafs, {self(), curNodeId}})
         else
-          send(nextHop, {:newNode, endCount, key, pid})
+          forward({:newNode, endCount, key, pid},nextHop)
+          #send(nextHop, {:newNode, endCount, key, pid})
         end
         receiveLoop(routeTable, leftLeafs, rightLeafs, curNodeId, master)
       {:routeTable, sourceRouteTable, senderPid, senderNodeId} ->
         routeTable = 
           updateRouteTable(routeTable, sourceRouteTable, curNodeId, senderNodeId, 0)
         {leftLeafs, rightLeafs} = addLeafNode(leftLeafs, rightLeafs, senderPid, senderNodeId, curNodeId)
+        newLeafs(leftLeafs ++ rightLeafs)
         #IO.puts "route " <> curNodeId <> " " <> senderNodeId <> " " <> to_string(length(sourceRouteTable))
         #IO.inspect(leftLeafs)
         #IO.inspect(rightLeafs)1
         #IO.inspect(routeTable)
         receiveLoop(routeTable, leftLeafs, rightLeafs, curNodeId, master)
-      {:startReq, numRequests, nodeList} ->
+      {:startReq, numRequests} ->
         #IO.puts "Starting " <> curNodeId
         #IO.inspect(nodeList)
-        spawn(Actor, :sendrequests, [numRequests ,nodeList, self()])
+        spawn(Actor, :sendrequests, [numRequests, self()])
         receiveLoop(routeTable, leftLeafs, rightLeafs, curNodeId, master)
       {:message, key, hopCount, startIndex} ->
         #IO.puts "Received "<>key<>" to "<>curNodeId
@@ -247,9 +251,11 @@ defmodule Actor do
         nextHop = getNextHop(key, routeTable, leftLeafs, rightLeafs, curNodeId, endCount)
         if (nextHop == self()) do
           #IO.puts "sending hopcount"
-          send(master, {:hopcount, hopCount})
+          deliver(master, hopCount)
+          
         else
-          send(nextHop, {:message, key, hopCount+1, endCount})
+          forward({:message, key, hopCount+1, endCount},nextHop)
+          #send(nextHop, {:message, key, hopCount+1, endCount})
         end
         receiveLoop(routeTable, leftLeafs, rightLeafs, curNodeId, master)
     end
@@ -295,7 +301,7 @@ defmodule Actor do
     sendRouteTable(routeTable, tail, nodeId)
   end
 
-  def start(startNode, nodeNum, master) do
+  def pastryInit(startNode, nodeNum, master) do
     nodeId = Base.encode16(:crypto.hash(:sha256, to_string(nodeNum)))
     nodeId = String.slice(nodeId, 2..33)
     #IO.puts nodeId
@@ -340,9 +346,9 @@ defmodule PASTRY do
 
   def createNodes(numNodes, nodes) do
     pid = if (nodes != []) do
-            spawn(Actor, :start, [[hd(nodes)], numNodes, self()])
+            spawn(Actor, :pastryInit, [[hd(nodes)], numNodes, self()])
           else
-            spawn(Actor, :start, [[], numNodes, self()])
+            spawn(Actor, :pastryInit, [[], numNodes, self()])
           end
     key = receiveConfirmation()
     nodes = [{pid, key} | nodes]
@@ -355,7 +361,7 @@ defmodule PASTRY do
 
   def sendStartMessage(nodeList, numRequests, remList) do
     {pid,_} = hd(remList)
-    send(pid, {:startReq, numRequests, Enum.slice(nodeList,0,100)})
+    send(pid, {:startReq, numRequests})
     #:timer.sleep(3000)
     sendStartMessage(nodeList, numRequests, tl(remList))
   end

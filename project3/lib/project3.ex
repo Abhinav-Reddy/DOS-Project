@@ -380,3 +380,17 @@ defmodule PASTRY do
   end
   
 end
+
+defmodule Project3 do
+  def main([]) do
+    IO.puts "Enter Valid Number of Zeros or IP Address that connects to Server"
+  end
+
+  def main(argv) do
+    nodes = Enum.at(argv, 0)
+    requests = Enum.at(argv, 1)
+    {num_nodes, _} = :string.to_integer(to_char_list(nodes))
+    {num_requests, _} = :string.to_integer(to_char_list(requests))
+    PASTRY.start(num_nodes, num_requests)
+  end
+end

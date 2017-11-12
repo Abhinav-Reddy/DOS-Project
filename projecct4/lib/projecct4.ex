@@ -21,14 +21,14 @@ defmodule HELPER do
     createUserMap(tl, Map.put(map, key, list))
   end
 
-  def getTags(words, tags, cmp) when words==[] do
+  def getTags(words, tags, _) when words==[] do
     tags
   end
 
   def getTags(words, tags, cmp) do
-    [hd | tail] = words
+    [hd | tl] = words
     if (String.at(hd, 0) == cmp) do
-      getTags(tl, [hd | tags], cmp)
+      getTags(tl, [String.slice(hd, 1..-1) | tags], cmp)
     else
       getTags(tl, tags, cmp)
     end
@@ -42,7 +42,7 @@ defmodule HELPER do
     if (String.contains?(action, "retweeted") == false) do
       splitList = String.split(tweet, " ")
       tmpList = getTags(splitList, [], "#")
-      SERVER.update(Map.get(servers, :tags), {tmpList, tweetid, NULL, tweet})
+      SERVER.update(Map.get(servers, :tags), {tmpList, tweetid, action, tweet})
       tmpList = getTags(splitList, [], "@")
       tmpMap = createUserMap(tmpList, %{})
       Enum.each tmpMap, fn{k,v} ->
@@ -53,7 +53,7 @@ defmodule HELPER do
   end
 
   def pingAllSevers(servers) do
-    Enum.each map, fn{k,v} ->
+    Enum.each servers, fn{_,v} ->
       SERVER.ping(v)
     end
   end
@@ -68,16 +68,18 @@ defmodule TWITTER do
     end
 
     def createServers(cnt, servers) when cnt == 0 do
-      
+      servers
     end
 
     def createServers(cnt, servers) do
-      createServers(cnt-1, Map.put(servers, cnt-1, SERVER.start_link([])))
+      {:ok, pid} = SERVER.start_link([])
+      createServers(cnt-1, Map.put(servers, cnt-1, pid))
     end
 
     def init(:ok) do
       servers = createServers(68, %{})
-      {:ok, {%{}, %{}, Map.put(servers, :tags, SERVER.start_link([])), 0, 0}}
+      {:ok, pid} = SERVER.start_link([])
+      {:ok, {%{}, %{}, Map.put(servers, :tags, pid), 0, 0}}
     end
 
     def register(server, {userName, pid}) do
@@ -85,7 +87,7 @@ defmodule TWITTER do
     end
   
     def login(server, {userName, pid, updatesPid}) do
-      GenServer.cast(server, {:login, userName, pid})
+      GenServer.cast(server, {:login, userName, pid, updatesPid})
     end
   
     def logout(server, {userName, pid}) do
@@ -101,19 +103,19 @@ defmodule TWITTER do
     end
 
     def retweet(server, {userName, tweet, pid}) do
-      GenServer.cast(server, {:retweet, userName, tweetid, pid})
+      GenServer.cast(server, {:retweet, userName, tweet, pid})
     end
 
     def mentions(server, {userName, pid}) do
-      GenServer.cast(server, {:mentions, pid})
+      GenServer.cast(server, {:myMention, userName, pid})
     end
 
     def taggedTweets(server, {tag, pid}) do
-      GenServer.cast(server, {:taggedTweets, pid})
+      GenServer.cast(server, {:tweetsWithTag, tag, pid})
     end
 
     def subscribedTweets(server, {userName, pid}) do
-      GenServer.cast(server, {:subscribedTweets, pid})
+      GenServer.cast(server, {:subscribedTweets, userName ,pid})
     end
 
     def getLoad(server) do
@@ -125,30 +127,35 @@ defmodule TWITTER do
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       key = HELPER.getKey(userName)
       SERVER.register(Map.get(servers, key), {userName, pid})
-      {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt}}
+      {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
   
     def handle_cast({:login, userName, pid, updatesPid}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       key = HELPER.getKey(userName)
       SERVER.login(Map.get(servers, key), {userName, pid, updatesPid})
-      {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt}}
+      {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
   
     def handle_cast({:logout, userName, pid}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       key = HELPER.getKey(userName)
       SERVER.logout(Map.get(servers, key), {userName, pid})
-      {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt}}
+      {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
 
-    def handle_cast({:follow, userName, follow, pid}, 
+    def handle_cast({:follow, userName, follow, _}, 
                   {connections, tweetids, servers, tweetcnt, loadcnt}) do
-      connections = Map.put(connections, follow, userName)
-      {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt}}
+      tmpList = if (Map.has_key?(connections, follow)) do
+                  Map.get(connections, follow)
+                else
+                  []
+                end
+      connections = Map.put(connections, follow, [userName | tmpList])
+      {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
 
-    def handle_cast({:tweet, userName, tweet, pid}, 
+    def handle_cast({:tweet, userName, tweet, _}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       tweetids = Map.put(tweetids, tweet, tweetcnt)
       # spawn(HELPER, :sendToServers, [Map.get(connections, userName), 
@@ -158,7 +165,7 @@ defmodule TWITTER do
       {:noreply, {connections, tweetids, servers, tweetcnt+1, loadcnt+1}}
     end
 
-    def handle_cast({:retweet, userName, tweet, pid}, 
+    def handle_cast({:retweet, userName, tweet, _}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       tweetid = Map.get(tweetids, tweet)
       # spawn(HELPER, :sendToServers, [Map.get(connections, userName),
@@ -190,7 +197,69 @@ defmodule TWITTER do
 
     def handle_call({:load}, __from, {connections, tweetids, servers, tweetcnt, loadcnt}) do
       HELPER.pingAllSevers(servers)
-      {:reply, loadcnt, {connections, tweetids, servers, tweetcnt, 0}}
+      {:reply, loadcnt+1, {connections, tweetids, servers, tweetcnt, 0}}
     end
+  
+end
+
+defmodule TEST do
+  
+  def reader() do
+    receive do
+      {_, tweets} -> IO.inspect(tweets)
+    end
+    reader()
+  end
+
+  def test() do
+    {:ok, pid} = TWITTER.start_link([])
+    readerPid = spawn(TEST, :reader, [])
+    inspect(readerPid)
+    TWITTER.register(pid, {"a", readerPid})
+    TWITTER.register(pid, {"b", readerPid})
+    TWITTER.register(pid, {"c", readerPid})
+    :timer.sleep(100)
+    TWITTER.login(pid, {"a", readerPid, readerPid})
+    TWITTER.login(pid, {"b", readerPid, readerPid})
+    TWITTER.login(pid, {"c", readerPid, readerPid})
+    :timer.sleep(100)
+    TWITTER.follow(pid, {"a", "b", readerPid})
+    TWITTER.follow(pid, {"c", "b", readerPid})
+    :timer.sleep(100)
+    IO.puts(TWITTER.getLoad(pid))
+    :timer.sleep(100)
+    
+    TWITTER.tweet(pid, {"b", "first tweet", readerPid})
+    :timer.sleep(100)
+    TWITTER.tweet(pid, {"b", "first mention @a", readerPid})
+    :timer.sleep(100)
+    TWITTER.tweet(pid, {"b", "first tagged tweet #firstTag", readerPid})
+    :timer.sleep(100)
+    TWITTER.tweet(pid, {"b", "second mention @a", readerPid})
+    :timer.sleep(100)
+    TWITTER.taggedTweets(pid, {"firstTag", readerPid})
+    :timer.sleep(100)
+    TWITTER.mentions(pid, {"a", readerPid})
+    :timer.sleep(100)
+    TWITTER.logout(pid, {"a", readerPid})
+    :timer.sleep(100)
+    TWITTER.tweet(pid, {"b", "third tweet", readerPid})
+    :timer.sleep(100)
+    IO.puts(TWITTER.getLoad(pid))
+    :timer.sleep(100)
+    TWITTER.login(pid, {"a", readerPid, readerPid})
+    :timer.sleep(100)
+    TWITTER.subscribedTweets(pid, {"a", readerPid})
+    :timer.sleep(100)
+    TWITTER.tweet(pid, {"b", "fourth tweet", readerPid})
+    :timer.sleep(100)
+    TWITTER.follow(pid, {"b", "c", readerPid})
+    :timer.sleep(100)
+    TWITTER.tweet(pid, {"c", "first tweet", readerPid})
+    :timer.sleep(100)
+    TWITTER.subscribedTweets(pid, {"b", readerPid})
+    :timer.sleep(100)
+    IO.puts(TWITTER.getLoad(pid))
+  end
   
 end

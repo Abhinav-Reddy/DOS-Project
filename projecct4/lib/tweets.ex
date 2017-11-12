@@ -5,14 +5,14 @@ defmodule SERVER do
   end
 
   def init(:ok) do
-    {:ok, {%{}, %{}}}
+    {:ok, {%{}, %{}, %{}}}
   end
 
   def register(server, {userName, pid}) do
     GenServer.cast(server, {:register, userName, pid})
   end
 
-  def login(server {userName, pid, updatesPid}) do
+  def login(server, {userName, pid, updatesPid}) do
     GenServer.cast(server, {:login, userName, pid, updatesPid})
   end
 
@@ -36,25 +36,25 @@ defmodule SERVER do
     GenServer.cast(server, {:subscribedTweets, userName, pid})
   end
 
-  def ping(sever) do
+  def ping(server) do
     GenServer.call(server, {:ping})
   end
 
-  def getTweetsFromIds(tweets, tweetids, res) when tweetids == [] do
+  def getTweetsFromIds(_, tweetids, res) when tweetids == [] do
     res
   end
 
   def getTweetsFromIds(tweets, tweetids, res) do
-    {{action, tweetid} | tl} = tweetids
+    [{tweetid, action} | tl] = tweetids
     getTweetsFromIds(tweets, tl, [{action, Map.get(tweets, tweetid)} | res])
   end
 
-  def getTweetsWithAction(tweets, tweetids, cmp, res) when tweetids == [] do
+  def getTweetsWithAction(_, tweetids, _, res) when tweetids == [] do
     res
   end
 
   def getTweetsWithAction(tweets, tweetids, cmp, res) do
-    {{action, tweetid} | tl} = tweetids
+    [{tweetid, action} | tl] = tweetids
     if (String.contains?(action, cmp) == true) do
       getTweetsWithAction(tweets, tl, cmp, [{action, Map.get(tweets, tweetid)} | res])
     else
@@ -63,7 +63,7 @@ defmodule SERVER do
   end
 
 
-  def updateTimeLines(users, tweetid, action, timeLines, registeredUsers, tweets) when users == [] do
+  def updateTimeLines(users, _, _, timeLines, _, _) when users == [] do
     timeLines
   end
 
@@ -73,9 +73,12 @@ defmodule SERVER do
                 Map.get(timeLines, hd)
               else
                 []
-    pid = Map.get(registeredUsers, hd)
-    if (pid != NULL) do
-      send(pid, Map.get(tweets, tweetid))
+              end
+    if (registeredUsers != %{}) do
+      pid = Map.get(registeredUsers, hd)
+      if (pid != :null) do
+        send(pid, {:timeLine, {action, Map.get(tweets, tweetid)}})
+      end
     end
     updateTimeLines(tl, tweetid, action, Map.put(timeLines, hd, [{tweetid, action} | tmpList]), 
       registeredUsers, tweets)
@@ -83,12 +86,12 @@ defmodule SERVER do
 
   def handle_cast({:register, userName, pid}, 
                     {timeLines, tweets, registeredUsers}) do
-    if Map.has_key?(registeredUsers, userName) == false do
+    if Map.has_key?(registeredUsers, userName) do
       send(pid, {:failed, "User name already exists"})
       {:noreply, {timeLines, tweets, registeredUsers}}
     else
       send(pid, {:success, "Registered successfully"})
-      { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, NULL)} }
+      { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, :null)} }
     end
   end
 
@@ -110,7 +113,7 @@ defmodule SERVER do
       {:noreply, {timeLines, tweets, registeredUsers}}
     else
       send(pid, {:success, "Logout successfull"})
-      { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, NULL)} }
+      { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, :null)} }
     end
   end
 
@@ -123,28 +126,28 @@ defmodule SERVER do
 
   def handle_cast({:myMention, userName, pid}, 
                     {timeLines, tweets, registeredUsers}) do
-    tweets = getTweetsWithAction(tweets, Map.get(timeLines, userName), "mention", [])
-    send(pid, tweets)
+    sendInfo = getTweetsWithAction(tweets, Map.get(timeLines, userName), "mention", [])
+    send(pid, {:myMention, sendInfo})
     {:noreply, {timeLines, tweets, registeredUsers}}
   end
 
   def handle_cast({:tweetsWithTag, tag, pid}, 
                     {timeLines, tweets, registeredUsers}) do
     tweetids = Map.get(timeLines, tag)
-    tweets = getTweetsFromIds(tweets, tweetids, [])
-    send(pid, tweets)
+    sendInfo = getTweetsFromIds(tweets, tweetids, [])
+    send(pid, {:tweetsWithTag, sendInfo})
     {:noreply, {timeLines, tweets, registeredUsers}}
   end
 
   def handle_cast({:subscribedTweets, userName, pid}, 
                     {timeLines, tweets, registeredUsers}) do
-    tweets = getTweetsWithAction(tweets, Map.get(timeLines, userName), "tweet", [])
-    send(pid, tweets)
+    sendInfo = getTweetsWithAction(tweets, Map.get(timeLines, userName), "tweet", [])
+    send(pid, {:subscribedTweets, sendInfo})
     {:noreply, {timeLines, tweets, registeredUsers}}
   end
   
-  def handle_call({:ping}, __from, {timeLines,tweets}) do
-    {:reply, :ok, {timeLines, tweets}}
+  def handle_call({:ping}, __from, {timeLines,tweets, registeredUsers}) do
+    {:reply, :ok, {timeLines, tweets, registeredUsers}}
   end
 
 end

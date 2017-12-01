@@ -2,7 +2,7 @@
 defmodule HELPER do
   
   def getKey(userName) do
-    Enum.at(to_charlist(String.at(userName, 0)), 0)-48
+    Enum.at(to_charlist(String.at(userName, 0)), 0)-65
   end
 
   def createUserMap(users, map) when users == [] do
@@ -151,7 +151,11 @@ defmodule TWITTER do
                 else
                   []
                 end
-      connections = Map.put(connections, follow, [userName | tmpList])
+      connections = if (Enum.member?(tmpList, userName)) do
+                      connections
+                    else
+                      Map.put(connections, follow, [userName | tmpList])
+                    end
       {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
 
@@ -202,64 +206,3 @@ defmodule TWITTER do
   
 end
 
-defmodule TEST do
-  
-  def reader() do
-    receive do
-      {_, tweets} -> IO.inspect(tweets)
-    end
-    reader()
-  end
-
-  def test() do
-    {:ok, pid} = TWITTER.start_link([])
-    readerPid = spawn(TEST, :reader, [])
-    inspect(readerPid)
-    TWITTER.register(pid, {"a", readerPid})
-    TWITTER.register(pid, {"b", readerPid})
-    TWITTER.register(pid, {"c", readerPid})
-    :timer.sleep(100)
-    TWITTER.login(pid, {"a", readerPid, readerPid})
-    TWITTER.login(pid, {"b", readerPid, readerPid})
-    TWITTER.login(pid, {"c", readerPid, readerPid})
-    :timer.sleep(100)
-    TWITTER.follow(pid, {"a", "b", readerPid})
-    TWITTER.follow(pid, {"c", "b", readerPid})
-    :timer.sleep(100)
-    IO.puts(TWITTER.getLoad(pid))
-    :timer.sleep(100)
-    
-    TWITTER.tweet(pid, {"b", "first tweet", readerPid})
-    :timer.sleep(100)
-    TWITTER.tweet(pid, {"b", "first mention @a", readerPid})
-    :timer.sleep(100)
-    TWITTER.tweet(pid, {"b", "first tagged tweet #firstTag", readerPid})
-    :timer.sleep(100)
-    TWITTER.tweet(pid, {"b", "second mention @a", readerPid})
-    :timer.sleep(100)
-    TWITTER.taggedTweets(pid, {"firstTag", readerPid})
-    :timer.sleep(100)
-    TWITTER.mentions(pid, {"a", readerPid})
-    :timer.sleep(100)
-    TWITTER.logout(pid, {"a", readerPid})
-    :timer.sleep(100)
-    TWITTER.tweet(pid, {"b", "third tweet", readerPid})
-    :timer.sleep(100)
-    IO.puts(TWITTER.getLoad(pid))
-    :timer.sleep(100)
-    TWITTER.login(pid, {"a", readerPid, readerPid})
-    :timer.sleep(100)
-    TWITTER.subscribedTweets(pid, {"a", readerPid})
-    :timer.sleep(100)
-    TWITTER.tweet(pid, {"b", "fourth tweet", readerPid})
-    :timer.sleep(100)
-    TWITTER.follow(pid, {"b", "c", readerPid})
-    :timer.sleep(100)
-    TWITTER.tweet(pid, {"c", "first tweet", readerPid})
-    :timer.sleep(100)
-    TWITTER.subscribedTweets(pid, {"b", readerPid})
-    :timer.sleep(100)
-    IO.puts(TWITTER.getLoad(pid))
-  end
-  
-end

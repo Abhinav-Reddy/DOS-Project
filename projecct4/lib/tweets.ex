@@ -53,6 +53,10 @@ defmodule SERVER do
     res
   end
 
+  def getTweetsWithAction(_, tweetids, _, res) when tweetids == nil do
+    res
+  end
+
   def getTweetsWithAction(tweets, tweetids, cmp, res) do
     [{tweetid, action} | tl] = tweetids
     if (String.contains?(action, cmp) == true) do
@@ -87,10 +91,10 @@ defmodule SERVER do
   def handle_cast({:register, userName, pid}, 
                     {timeLines, tweets, registeredUsers}) do
     if Map.has_key?(registeredUsers, userName) do
-      send(pid, {:failed, "User name already exists"})
+      send(pid, {:failed, "User name already exists " <> userName})
       {:noreply, {timeLines, tweets, registeredUsers}}
     else
-      send(pid, {:success, "Registered successfully"})
+      send(pid, {:success, "Registered successfully " <> userName})
       { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, :null)} }
     end
   end
@@ -98,10 +102,10 @@ defmodule SERVER do
   def handle_cast({:login, userName, pid, updatesPid}, 
                     {timeLines, tweets, registeredUsers}) do
     if Map.has_key?(registeredUsers, userName) == false do
-      send(pid, {:failed, "User name doesnt exist"})
+      send(pid, {:failed, "User name doesnt exist "<> userName})
       {:noreply, {timeLines, tweets, registeredUsers}}
     else
-      send(pid, {:success, "Login successfull"})
+      send(pid, {:success, "Login successfull " <> userName})
       { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, updatesPid)} }
     end
   end
@@ -109,10 +113,10 @@ defmodule SERVER do
   def handle_cast({:logout, userName, pid}, 
                     {timeLines, tweets, registeredUsers}) do
     if Map.has_key?(registeredUsers, userName) == false do
-      send(pid, {:failed, "User name doesnt exist"})
+      send(pid, {:failed, "User name doesnt exist " <> userName}) 
       {:noreply, {timeLines, tweets, registeredUsers}}
     else
-      send(pid, {:success, "Logout successfull"})
+      send(pid, {:success, "Logout successfull " <> userName})
       { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, :null)} }
     end
   end

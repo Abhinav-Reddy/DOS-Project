@@ -130,7 +130,12 @@ defmodule SERVER do
 
   def handle_cast({:myMention, userName, pid}, 
                     {timeLines, tweets, registeredUsers}) do
-    sendInfo = getTweetsWithAction(tweets, Map.get(timeLines, userName), "mention", [])
+    tweetids = Map.get(timeLines, userName)
+    sendInfo = if (tweetids != nil) do
+                  getTweetsWithAction(tweets, tweetids, "mention", [])
+               else
+                  tweetids
+               end
     send(pid, {:myMention, sendInfo})
     {:noreply, {timeLines, tweets, registeredUsers}}
   end
@@ -138,14 +143,23 @@ defmodule SERVER do
   def handle_cast({:tweetsWithTag, tag, pid}, 
                     {timeLines, tweets, registeredUsers}) do
     tweetids = Map.get(timeLines, tag)
-    sendInfo = getTweetsFromIds(tweets, tweetids, [])
+    sendInfo = if (tweetids != nil) do
+                getTweetsFromIds(tweets, tweetids, [])
+               else
+                tweetids
+               end
     send(pid, {:tweetsWithTag, sendInfo})
     {:noreply, {timeLines, tweets, registeredUsers}}
   end
 
   def handle_cast({:subscribedTweets, userName, pid}, 
                     {timeLines, tweets, registeredUsers}) do
-    sendInfo = getTweetsWithAction(tweets, Map.get(timeLines, userName), "tweet", [])
+    tweetids = Map.get(timeLines, userName)
+    sendInfo = if (tweetids != nil) do
+                getTweetsWithAction(tweets, tweetids, "tweet", [])
+               else
+                tweetids
+               end
     send(pid, {:subscribedTweets, sendInfo})
     {:noreply, {timeLines, tweets, registeredUsers}}
   end

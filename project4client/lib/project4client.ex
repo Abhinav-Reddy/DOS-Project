@@ -211,13 +211,12 @@ defmodule PROJECT4CLIENT do
           randTags = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
           readerPids = registerUsers(userNames, [], userNames)
           readerPids = Enum.reverse(readerPids)
-          :timer.sleep(2000)
+          :timer.sleep(numUsers)
           loginUsers(userNames, readerPids)
-          :timer.sleep(2000)
+          :timer.sleep(numUsers)
           addFollowers(userNames, userNames, 7*length(userNames)/100+1, 1, readerPids)
-          :timer.sleep(2000)
+          :timer.sleep(numUsers)
           createWorkGenerators(readerPids, userNames, randTags, length(userNames))
-  
           loop()
       end
   
@@ -227,11 +226,11 @@ defmodule PROJECT4CLIENT do
         randTags = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         readerPids = registerUsers(userNames, [], userNames)
         readerPids = Enum.reverse(readerPids)
-        :timer.sleep(1000)
+        :timer.sleep(numUsers)
         loginUsers(userNames, readerPids)
-        :timer.sleep(1000)
+        :timer.sleep(numUsers)
         addFollowers(userNames, userNames, length(userNames)/2+1, 1, readerPids)
-        :timer.sleep(1000)
+        :timer.sleep(numUsers)
         
         #IO.puts(TWITTER.getLoad(server))
         :timer.sleep(100)

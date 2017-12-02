@@ -280,3 +280,16 @@ defmodule PROJECT4CLIENT do
       end
     end
   
+    defmodule ProjectClient do
+        def main([]) do
+          IO.puts "Enter Valid Number of Clients"
+        end
+      
+        def main(argv) do
+            val = List.first(argv)
+            user_count = String.to_integer(val)
+            PROJECT4CLIENT.startClient(user_count)
+        end
+          
+    end
+      

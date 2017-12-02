@@ -190,16 +190,20 @@ defmodule TEST do
     def createWorkGenerators(readerPids, userNames, randTags, count) do
         [hd | tl] = readerPids
         #waitTime = round(Float.ceil(count/50)*200)
-        waitTime = 500
+        waitTime = round(Float.ceil(count/10))
         # waitTime = if (waitTime > 250) do
         #                 250
         #             else
         #                 waitTime
         #             end
         spawn(TEST, :startWorker, [hd, userNames, randTags, waitTime])
-        createWorkGenerators(tl, userNames, randTags, count+1)
+        createWorkGenerators(tl, userNames, randTags, count)
     end
 
+    def loop() do
+        :timer.sleep(2)
+        loop()
+    end
     def startClients(numUsers) do
         {:ok, server} = TWITTER.start_link([])
         userNames = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -211,7 +215,8 @@ defmodule TEST do
         :timer.sleep(2000)
         addFollowers(userNames, userNames, 7*length(userNames)/100+1, 1, readerPids)
         :timer.sleep(2000)
-        createWorkGenerators(readerPids, userNames, randTags, 1)
+        createWorkGenerators(readerPids, userNames, randTags, length(userNames))
+        loop()
     end
 
     def test(numUsers) do
@@ -264,4 +269,16 @@ defmodule TEST do
       IO.puts(TWITTER.getLoad(server))
     end
     
+  end
+
+  defmodule Project4 do
+    def main([]) do
+      IO.puts "Enter Valid Number of Zeros or IP Address that connects to Server"
+    end
+  
+    def main(argv) do
+        val = List.first(argv)
+        numUsers = String.to_integer(val)
+        TEST.startClients(numUsers)
+    end
   end

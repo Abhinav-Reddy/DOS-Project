@@ -63,6 +63,12 @@ end
 defmodule TWITTER do
   use GenServer
   
+    def startLoadManager(server) do
+      :timer.sleep(1000)
+      IO.puts(TWITTER.getLoad(server))
+      startLoadManager(server)
+    end
+
     def start_link(opts) do
       GenServer.start_link(__MODULE__, :ok, opts)
     end
@@ -77,6 +83,7 @@ defmodule TWITTER do
     end
 
     def init(:ok) do
+      spawn(TWITTER ,:startLoadManager, [self()])
       servers = createServers(68, %{})
       {:ok, pid} = SERVER.start_link([])
       {:ok, {%{}, %{}, Map.put(servers, :tags, pid), 0, 0}}

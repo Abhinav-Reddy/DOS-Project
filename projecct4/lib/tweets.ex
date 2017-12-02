@@ -78,6 +78,11 @@ defmodule SERVER do
               else
                 []
               end
+    tmpList = if (tmpList > 2) do
+                Enum.slice(tmpList, 0, 2)
+              else
+                tmpList
+              end
     if (registeredUsers != %{}) do
       pid = Map.get(registeredUsers, hd)
       if (pid != :null) do

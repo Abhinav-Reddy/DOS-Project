@@ -9,12 +9,12 @@ defmodule TEST do
             {:logout} -> TWITTER.logout(server, {userName, self()})
                          timeLine
             {:follow, user} -> 
-                IO.inspect(user<>" following "<>userName)
+                #IO.inspect(user<>" following "<>userName)
                 TWITTER.follow(server, {user, userName, self()})
                 timeLine
-            {:success, info} -> IO.inspect(info)
+            {:success, info} -> #IO.inspect(info)
                 timeLine
-            {:failed, info} -> IO.inspect(info)
+            {:failed, info} -> #IO.inspect(info)
                 timeLine
             {:tweet} -> TWITTER.tweet(server, {userName, 
                                                 to_string(:os.system_time(:millisecond)), self()})
@@ -28,24 +28,28 @@ defmodule TEST do
             {:myMention} -> TWITTER.mentions(server, {userName, self()})
                 timeLine
             {:myMention, tweets} -> 
-                IO.puts("My mentions "<> userName)
-                IO.inspect(tweets)
+                #IO.puts("My mentions "<> userName)
+                #IO.inspect(tweets)
                 timeLine
             {:gettweetsWithTag, tag} -> TWITTER.taggedTweets(server, {tag, self()})
                 timeLine
             {:tweetsWithTag, tweets} ->
-                IO.puts("Tweets with tag " <> userName ) 
-                IO.inspect(tweets)
+                #IO.puts("Tweets with tag " <> userName ) 
+                #IO.inspect(tweets)
                 timeLine
             {:getsubscribedTweets} -> TWITTER.subscribedTweets(server, {userName, self()})
                 timeLine
             {:subscribedTweets, tweets} -> 
-                IO.puts("Subscribed Tweets " <> userName)
-                IO.inspect(tweets)
-                tweets
+                #IO.puts("Subscribed Tweets " <> userName)
+                #IO.inspect(tweets)
+                if (tweets != nil) do
+                    tweets
+                else
+                    timeLine
+                end
             {:timeLine, tweet} ->
-                IO.puts("Timeline update " <> userName)
-                IO.inspect(tweet) 
+                #IO.puts("Timeline update " <> userName)
+                #IO.inspect(tweet) 
                 [tweet | timeLine]
             {:retweet} ->
                 len = length(timeLine)
@@ -67,7 +71,7 @@ defmodule TEST do
         [userName | tl] = users
         TWITTER.register(server, {userName, self()})
         receive do
-            {_, tweets} -> IO.inspect(tweets)
+            {_, tweets} -> #IO.inspect(tweets)
         end
         timeLine = []
         readerPid = spawn(TEST, :userFunctions, [server, timeLine, allUsers, userName])
@@ -134,10 +138,10 @@ defmodule TEST do
     def addFollowers(remUsers, allUsers, count, factor, readerPids) do
         [hd | tl] = remUsers
         [hdPid | tlPids] = readerPids
-        tmpCnt = if (count/factor > 20) do
+        tmpCnt = if (count/factor > 5) do
                     count/factor
-                 else
-                    min(count, 20)
+                 else5
+                    min(count, 5)
                  end
         randUsers = getRandomUsers(hd, allUsers, tmpCnt, [], length(allUsers))
         sendFollowRequests(hd, randUsers, hdPid)
@@ -145,7 +149,7 @@ defmodule TEST do
     end
 
     def startWorker(pid, userNames, randTags, waitTime) do
-        
+        #IO.inspect(waitTime)
         :timer.sleep(waitTime)
         action = :rand.uniform(90)
         if (action <= 20) do
@@ -155,7 +159,7 @@ defmodule TEST do
             else if (tweetAction == 2) do
                 send(pid, {:tweet, :mention, Enum.at(userNames, :rand.uniform(length(userNames)-1))})
             else
-                send(pids, {:tweet, :tag, Enum.at(randTags, :rand.uniform(length(randTags)-1))})
+                send(pid, {:tweet, :tag, Enum.at(randTags, :rand.uniform(length(randTags)-1))})
             end
             end
         else if (action <= 40) do
@@ -179,13 +183,19 @@ defmodule TEST do
         startWorker(pid, userNames, randTags, waitTime)
     end
 
-    def createWorkGenerators(readerPids, userNames, randTags) when readerPids == [] do
+    def createWorkGenerators(readerPids, _, _, _) when readerPids == [] do
         
     end
 
     def createWorkGenerators(readerPids, userNames, randTags, count) do
         [hd | tl] = readerPids
-        waitTime = ceil(count/100)*100
+        #waitTime = round(Float.ceil(count/50)*200)
+        waitTime = 666
+        # waitTime = if (waitTime > 250) do
+        #                 250
+        #             else
+        #                 waitTime
+        #             end
         spawn(TEST, :startWorker, [hd, userNames, randTags, waitTime])
         createWorkGenerators(tl, userNames, randTags, count+1)
     end
@@ -196,11 +206,11 @@ defmodule TEST do
         randTags = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         readerPids = registerUsers(server, userNames, [], userNames)
         readerPids = Enum.reverse(readerPids)
-        :timer.sleep(100)
+        :timer.sleep(5000)
         loginUsers(server, userNames, readerPids)
-        :timer.sleep(100)
-        addFollowers(userNames, userNames, length(userNames)/2+1, 1, readerPids)
-        :timer.sleep(100)
+        :timer.sleep(5000)
+        addFollowers(userNames, userNames, 7*length(userNames)/100+1, 1, readerPids)
+        :timer.sleep(5000)
         createWorkGenerators(readerPids, userNames, randTags, 1)
     end
 

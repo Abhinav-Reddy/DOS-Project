@@ -3,41 +3,41 @@ defmodule TEST do
 
     def userFunctions(server, timeLine, allUsers, userName) do
         timeLine = receive do
-            {:login} -> TWITTER.login(server, {userName, self(), self()})
-                        TWITTER.subscribedTweets(server, {userName, self()})
+            {:login} -> TWITTER.login({MyServer, server}, {userName, self(), self()})
+                        TWITTER.subscribedTweets({MyServer, server}, {userName, self()})
                         timeLine
-            {:logout} -> TWITTER.logout(server, {userName, self()})
+            {:logout} -> TWITTER.logout({MyServer, server}, {userName, self()})
                          timeLine
             {:follow, user} -> 
                 #IO.inspect(user<>" following "<>userName)
-                TWITTER.follow(server, {user, userName, self()})
+                TWITTER.follow({MyServer, server}, {user, userName, self()})
                 timeLine
             {:success, info} -> #IO.inspect(info)
                 timeLine
             {:failed, info} -> #IO.inspect(info)
                 timeLine
-            {:tweet} -> TWITTER.tweet(server, {userName, 
+            {:tweet} -> TWITTER.tweet({MyServer, server}, {userName, 
                                                 to_string(:os.system_time(:millisecond)), self()})
                 timeLine
-            {:tweet, :mention, user} -> TWITTER.tweet(server, {userName, 
+            {:tweet, :mention, user} -> TWITTER.tweet({MyServer, server}, {userName, 
                                             to_string(:os.system_time(:millisecond)) <> " @" <> user, self()})
                 timeLine
-            {:tweet, :tag, tag} -> TWITTER.tweet(server, {userName, 
+            {:tweet, :tag, tag} -> TWITTER.tweet({MyServer, server}, {userName, 
                                             to_string(:os.system_time(:millisecond)) <> " #" <> tag, self()})
                 timeLine        
-            {:myMention} -> TWITTER.mentions(server, {userName, self()})
+            {:myMention} -> TWITTER.mentions({MyServer, server}, {userName, self()})
                 timeLine
             {:myMention, tweets} -> 
                 #IO.puts("My mentions "<> userName)
                 #IO.inspect(tweets)
                 timeLine
-            {:gettweetsWithTag, tag} -> TWITTER.taggedTweets(server, {tag, self()})
+            {:gettweetsWithTag, tag} -> TWITTER.taggedTweets({MyServer, server}, {tag, self()})
                 timeLine
             {:tweetsWithTag, tweets} ->
                 #IO.puts("Tweets with tag " <> userName ) 
                 #IO.inspect(tweets)
                 timeLine
-            {:getsubscribedTweets} -> TWITTER.subscribedTweets(server, {userName, self()})
+            {:getsubscribedTweets} -> TWITTER.subscribedTweets({MyServer, server}, {userName, self()})
                 timeLine
             {:subscribedTweets, tweets} -> 
                 #IO.puts("Subscribed Tweets " <> userName)
@@ -56,37 +56,38 @@ defmodule TEST do
                 if (len > 0) do
                     len = :rand.uniform(len) - 1
                     {_, tweet} = Enum.at(timeLine, len)
-                    TWITTER.retweet(server, {userName, tweet, self()}) 
+                    TWITTER.retweet({MyServer, server}, {userName, tweet, self()}) 
                 end
                 timeLine
         end
         userFunctions(server, timeLine, allUsers, userName)
     end
 
-    def registerUsers(_, users, readerPids, _) when users == [] do
+    def registerUsers( users, readerPids, _) when users == [] do
         readerPids
     end
 
-    def registerUsers(server, users, readerPids, allUsers) do
+    def registerUsers(users, readerPids, allUsers) do
         [userName | tl] = users
-        TWITTER.register(server, {userName, self()})
+        server = String.to_atom("server@127.0.0.1")
+        TWITTER.register({MyServer, server}, {userName, self()})
         receive do
-            {_, tweets} -> #IO.inspect(tweets)
+            {_, tweets} -> 2 #IO.inspect(tweets)
         end
         timeLine = []
         readerPid = spawn(TEST, :userFunctions, [server, timeLine, allUsers, userName])
-        registerUsers(server ,tl, [readerPid | readerPids], allUsers)
+        registerUsers(tl, [readerPid | readerPids], allUsers)
     end
 
 
-    def loginUsers(_, _, readerPids) when readerPids == [] do
+    def loginUsers(_, readerPids) when readerPids == [] do
 
     end
     
-    def loginUsers(server ,allUsers, readerPids) do
+    def loginUsers(allUsers, readerPids) do
         [hdPid | tlPids] = readerPids
         send(hdPid, {:login})
-        loginUsers(server, allUsers, tlPids)
+        loginUsers(allUsers, tlPids)
     end
 
 
@@ -190,7 +191,7 @@ defmodule TEST do
     def createWorkGenerators(readerPids, userNames, randTags, count) do
         [hd | tl] = readerPids
         #waitTime = round(Float.ceil(count/50)*200)
-        waitTime = round(Float.ceil(count/10))
+        waitTime = round(Float.ceil(count/10)*(count/5000))
         # waitTime = if (waitTime > 250) do
         #                 250
         #             else
@@ -205,54 +206,55 @@ defmodule TEST do
         loop()
     end
     def startClients(numUsers) do
-        {:ok, server} = TWITTER.start_link([])
+        #{:ok, server} = TWITTER.start_link([])
         userNames = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         randTags = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-        readerPids = registerUsers(server, userNames, [], userNames)
+        readerPids = registerUsers(userNames, [], userNames)
         readerPids = Enum.reverse(readerPids)
         :timer.sleep(2000)
-        loginUsers(server, userNames, readerPids)
+        loginUsers(userNames, readerPids)
         :timer.sleep(2000)
         addFollowers(userNames, userNames, 7*length(userNames)/100+1, 1, readerPids)
         :timer.sleep(2000)
         createWorkGenerators(readerPids, userNames, randTags, length(userNames))
+
         loop()
     end
 
     def test(numUsers) do
-      {:ok, server} = TWITTER.start_link([])
+      #{:ok, server} = TWITTER.start_link([])
       userNames = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
       randTags = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-      readerPids = registerUsers(server, userNames, [], userNames)
+      readerPids = registerUsers(userNames, [], userNames)
       readerPids = Enum.reverse(readerPids)
-      :timer.sleep(100)
-      loginUsers(server, userNames, readerPids)
-      :timer.sleep(100)
+      :timer.sleep(1000)
+      loginUsers(userNames, readerPids)
+      :timer.sleep(1000)
       addFollowers(userNames, userNames, length(userNames)/2+1, 1, readerPids)
-      :timer.sleep(100)
+      :timer.sleep(1000)
       
-      IO.puts(TWITTER.getLoad(server))
+      #IO.puts(TWITTER.getLoad(server))
       :timer.sleep(100)
       
       send(Enum.at(readerPids, 0), {:tweet})
-      :timer.sleep(100)
+      :timer.sleep(1000)
       send(Enum.at(readerPids, 0), {:tweet, :mention, Enum.at(userNames, 1)})
-      :timer.sleep(100)
+      :timer.sleep(1000)
       send(Enum.at(readerPids, 0), {:tweet, :tag, Enum.at(randTags, 0)})
-      :timer.sleep(100)
+      :timer.sleep(1000)
       send(Enum.at(readerPids, 0), {:tweet, :mention, Enum.at(userNames, 1)})
-      :timer.sleep(100)
+      :timer.sleep(1000)
       send(Enum.at(readerPids, 0), {:gettweetsWithTag, Enum.at(randTags, 0)})
-      :timer.sleep(100)
+      :timer.sleep(1000)
       send(Enum.at(readerPids, 1), {:myMention})
-      :timer.sleep(100)
+      :timer.sleep(1000)
       send(Enum.at(readerPids, 1), {:tweet})
-      :timer.sleep(100)
+      :timer.sleep(1000)
       send(Enum.at(readerPids, 1), {:logout})
-      :timer.sleep(100)
+      :timer.sleep(1000)
       send(Enum.at(readerPids, 0), {:tweet})
       :timer.sleep(100)
-      IO.puts(TWITTER.getLoad(server))
+      #IO.puts(TWITTER.getLoad(server))
       :timer.sleep(100)
       send(Enum.at(readerPids, 1), {:login})
       :timer.sleep(100)
@@ -266,9 +268,17 @@ defmodule TEST do
       :timer.sleep(100)
       send(Enum.at(readerPids, 0), {:getsubscribedTweets})
       :timer.sleep(100)
-      IO.puts(TWITTER.getLoad(server))
+      #IO.puts(TWITTER.getLoad(server))
     end
     
+    def startClient(numUsers) do
+        clientIpaddr = "client@127.0.0.1"
+        Node.start(String.to_atom(clientIpaddr))
+        Node.set_cookie(:"project1")
+        Node.connect(String.to_atom("server@127.0.0.1"))
+        startClients(numUsers)
+        #test(numUsers)
+    end
   end
 
   defmodule Project4 do
@@ -281,4 +291,4 @@ defmodule TEST do
         numUsers = String.to_integer(val)
         TEST.startClients(numUsers)
     end
-  end
+  end   

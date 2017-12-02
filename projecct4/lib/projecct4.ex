@@ -70,7 +70,7 @@ defmodule TWITTER do
     end
 
     def start_link(opts) do
-      GenServer.start_link(__MODULE__, :ok, opts)
+      GenServer.start_link(__MODULE__, :ok, name: MyServer)
     end
 
     def createServers(cnt, servers) when cnt == 0 do
@@ -210,6 +210,18 @@ defmodule TWITTER do
       HELPER.pingAllSevers(servers)
       {:reply, loadcnt+1, {connections, tweetids, servers, tweetcnt, 0}}
     end
-  
+    
+    def loop() do
+      :timer.sleep(10)
+      loop()
+    end
+    
+    def startServer() do
+      {:ok, server} = TWITTER.start_link([])
+      serverIpaddr = "server@127.0.0.1"
+      Node.start(String.to_atom(serverIpaddr))
+      Node.set_cookie(:"project1")
+      loop()
+    end
 end
 

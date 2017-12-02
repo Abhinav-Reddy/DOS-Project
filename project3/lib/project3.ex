@@ -397,6 +397,6 @@ defmodule Project3 do
     requests = Enum.at(argv, 1)
     {num_nodes, _} = :string.to_integer(to_char_list(nodes))
     {num_requests, _} = :string.to_integer(to_char_list(requests))
-    PASTRY.start(num_nodes, num_requests)
+    IO.puts PASTRY.start(num_nodes, num_requests)
   end
 end

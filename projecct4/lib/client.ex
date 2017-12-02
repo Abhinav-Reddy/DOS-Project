@@ -140,7 +140,7 @@ defmodule TEST do
         [hdPid | tlPids] = readerPids
         tmpCnt = if (count/factor > 5) do
                     count/factor
-                 else5
+                 else
                     min(count, 5)
                  end
         randUsers = getRandomUsers(hd, allUsers, tmpCnt, [], length(allUsers))
@@ -152,7 +152,7 @@ defmodule TEST do
         #IO.inspect(waitTime)
         :timer.sleep(waitTime)
         action = :rand.uniform(90)
-        if (action <= 20) do
+        if (action <= 15) do
             tweetAction = :rand.uniform(3)
             if (tweetAction == 1) do
                 send(pid, {:tweet})
@@ -162,15 +162,15 @@ defmodule TEST do
                 send(pid, {:tweet, :tag, Enum.at(randTags, :rand.uniform(length(randTags)-1))})
             end
             end
-        else if (action <= 40) do
+        else if (action <= 30) do
                 send(pid, {:retweet})
-        else if (action <= 60) do
+        else if (action <= 45) do
                 send(pid, {:getsubscribedTweets})
-        else if (action <= 70) do
+        else if (action <= 60) do
                 send(pid, {:myMention})
-        else if (action <= 80) do
+        else if (action <= 75) do
                 send(pid, {:gettweetsWithTag, Enum.at(randTags, :rand.uniform(length(randTags)-1))})
-        else if (action <= 85) do
+        else if (action <= 83) do
                 send(pid, {:logout})
         else
             send(pid, {:login})
@@ -190,7 +190,7 @@ defmodule TEST do
     def createWorkGenerators(readerPids, userNames, randTags, count) do
         [hd | tl] = readerPids
         #waitTime = round(Float.ceil(count/50)*200)
-        waitTime = 666
+        waitTime = 500
         # waitTime = if (waitTime > 250) do
         #                 250
         #             else
@@ -206,11 +206,11 @@ defmodule TEST do
         randTags = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         readerPids = registerUsers(server, userNames, [], userNames)
         readerPids = Enum.reverse(readerPids)
-        :timer.sleep(5000)
+        :timer.sleep(2000)
         loginUsers(server, userNames, readerPids)
-        :timer.sleep(5000)
+        :timer.sleep(2000)
         addFollowers(userNames, userNames, 7*length(userNames)/100+1, 1, readerPids)
-        :timer.sleep(5000)
+        :timer.sleep(2000)
         createWorkGenerators(readerPids, userNames, randTags, 1)
     end
 

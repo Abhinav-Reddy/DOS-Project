@@ -232,7 +232,7 @@ defmodule Project4 do
 
   def main([]) do
 
-    HELPER.startServer()
+    TWITTER.startServer()
     
   end
 

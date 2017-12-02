@@ -190,7 +190,12 @@ defmodule PROJECT4CLIENT do
   
       def createWorkGenerators(readerPids, userNames, randTags, count, pos) do
           [hd | tl] = readerPids
-          waitTime = round(Float.ceil(count/10)*(count/5000))
+          waitTime = if (count <= 1000) do
+                        50
+                     else
+                        round(Float.ceil(50+100*(count/1000-1)))
+                     end
+        #   waitTime = round(Float.ceil(count/5)*(count/5000))
           waitTime = round(Float.ceil(waitTime - waitTime/(3*pos)))
           spawn(PROJECT4CLIENT, :startWorker, [hd, userNames, randTags, waitTime])
           createWorkGenerators(tl, userNames, randTags, count, pos+1)
@@ -210,7 +215,7 @@ defmodule PROJECT4CLIENT do
           loginUsers(userNames, readerPids)
           :timer.sleep(numUsers)
           addFollowers(userNames, userNames, 7*length(userNames)/100+1, 1, readerPids)
-          :timer.sleep(numUsers*2)
+          :timer.sleep(numUsers)
           createWorkGenerators(readerPids, userNames, randTags, length(userNames), 1)
           loop()
       end

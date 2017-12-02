@@ -3,60 +3,60 @@ defmodule TEST do
 
     def userFunctions(server, timeLine, allUsers, userName) do
         timeLine = receive do
-            {:login} -> TWITTER.login({MyServer, server}, {userName, self(), self()})
-                        TWITTER.subscribedTweets({MyServer, server}, {userName, self()})
+            {:login} -> GenServer.cast({MyServer, server}, {:login, userName, self(), self()})
+                        GenServer.cast({MyServer, server}, {:subscribedTweets, userName, self()})
                         timeLine
-            {:logout} -> TWITTER.logout({MyServer, server}, {userName, self()})
+            {:logout} -> GenServer.cast({MyServer, server}, {:logout ,userName, self()})
                          timeLine
             {:follow, user} -> 
-                #IO.inspect(user<>" following "<>userName)
-                TWITTER.follow({MyServer, server}, {user, userName, self()})
+                IO.inspect(user<>" following "<>userName)
+                GenServer.cast({MyServer, server}, {:follow ,user, userName, self()})
                 timeLine
-            {:success, info} -> #IO.inspect(info)
+            {:success, info} -> IO.inspect(info)
                 timeLine
-            {:failed, info} -> #IO.inspect(info)
+            {:failed, info} -> IO.inspect(info)
                 timeLine
-            {:tweet} -> TWITTER.tweet({MyServer, server}, {userName, 
+            {:tweet} -> GenServer.cast({MyServer, server}, {:tweet, userName, 
                                                 to_string(:os.system_time(:millisecond)), self()})
                 timeLine
-            {:tweet, :mention, user} -> TWITTER.tweet({MyServer, server}, {userName, 
+            {:tweet, :mention, user} -> GenServer.cast({MyServer, server}, {:tweet, userName, 
                                             to_string(:os.system_time(:millisecond)) <> " @" <> user, self()})
                 timeLine
-            {:tweet, :tag, tag} -> TWITTER.tweet({MyServer, server}, {userName, 
+            {:tweet, :tag, tag} -> GenServer.cast({MyServer, server}, {:tweet, userName, 
                                             to_string(:os.system_time(:millisecond)) <> " #" <> tag, self()})
                 timeLine        
-            {:myMention} -> TWITTER.mentions({MyServer, server}, {userName, self()})
+            {:myMention} -> GenServer.cast({MyServer, server}, {:myMention, userName, self()})
                 timeLine
             {:myMention, tweets} -> 
-                #IO.puts("My mentions "<> userName)
-                #IO.inspect(tweets)
+                IO.puts("My mentions "<> userName)
+                IO.inspect(tweets)
                 timeLine
-            {:gettweetsWithTag, tag} -> TWITTER.taggedTweets({MyServer, server}, {tag, self()})
+            {:gettweetsWithTag, tag} -> GenServer.cast({MyServer, server}, {:tweetsWithTag, tag, self()})
                 timeLine
             {:tweetsWithTag, tweets} ->
-                #IO.puts("Tweets with tag " <> userName ) 
-                #IO.inspect(tweets)
+                IO.puts("Tweets with tag " <> userName ) 
+                IO.inspect(tweets)
                 timeLine
-            {:getsubscribedTweets} -> TWITTER.subscribedTweets({MyServer, server}, {userName, self()})
+            {:getsubscribedTweets} -> GenServer.cast({MyServer, server}, {:subscribedTweets ,userName, self()})
                 timeLine
             {:subscribedTweets, tweets} -> 
-                #IO.puts("Subscribed Tweets " <> userName)
-                #IO.inspect(tweets)
+                IO.puts("Subscribed Tweets " <> userName)
+                IO.inspect(tweets)
                 if (tweets != nil) do
                     tweets
                 else
                     timeLine
                 end
             {:timeLine, tweet} ->
-                #IO.puts("Timeline update " <> userName)
-                #IO.inspect(tweet) 
+                IO.puts("Timeline update " <> userName)
+                IO.inspect(tweet) 
                 [tweet | timeLine]
             {:retweet} ->
                 len = length(timeLine)
                 if (len > 0) do
                     len = :rand.uniform(len) - 1
                     {_, tweet} = Enum.at(timeLine, len)
-                    TWITTER.retweet({MyServer, server}, {userName, tweet, self()}) 
+                    GenServer.cast({MyServer, server}, {:retweet, userName, tweet, self()}) 
                 end
                 timeLine
         end
@@ -280,15 +280,3 @@ defmodule TEST do
         #test(numUsers)
     end
   end
-
-  defmodule Project4 do
-    def main([]) do
-      IO.puts "Enter Valid Number of Zeros or IP Address that connects to Server"
-    end
-  
-    def main(argv) do
-        val = List.first(argv)
-        numUsers = String.to_integer(val)
-        TEST.startClients(numUsers)
-    end
-  end   

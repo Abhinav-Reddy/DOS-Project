@@ -63,13 +63,16 @@ end
 defmodule TWITTER do
   use GenServer
   
-    def startLoadManager(server) do
-      :timer.sleep(1000)
-      IO.puts(TWITTER.getLoad(server))
-      startLoadManager(server)
+    def startLoadManager(server, prevTime) do
+      :timer.sleep(950)
+      count = TWITTER.getLoad(server)
+      curTime = :os.system_time(:millisecond)
+      prevTime = (curTime - prevTime)/1000
+      IO.puts(round(Float.ceil(count/prevTime)))
+      startLoadManager(server, curTime)
     end
 
-    def start_link(opts) do
+    def start_link(_) do
       GenServer.start_link(__MODULE__, :ok, name: MyServer)
     end
 
@@ -83,7 +86,7 @@ defmodule TWITTER do
     end
 
     def init(:ok) do
-      spawn(TWITTER ,:startLoadManager, [self()])
+      spawn(TWITTER ,:startLoadManager, [self(), :os.system_time(:millisecond)])
       servers = createServers(68, %{})
       {:ok, pid} = SERVER.start_link([])
       {:ok, {%{}, %{}, Map.put(servers, :tags, pid), 0, 0}}
@@ -217,7 +220,7 @@ defmodule TWITTER do
     end
     
     def startServer() do
-      {:ok, server} = TWITTER.start_link([])
+      {:ok, _} = TWITTER.start_link([])
       serverIpaddr = "server@127.0.0.1"
       Node.start(String.to_atom(serverIpaddr))
       Node.set_cookie(:"project1")

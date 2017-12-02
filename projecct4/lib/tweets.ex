@@ -78,8 +78,8 @@ defmodule SERVER do
               else
                 []
               end
-    tmpList = if (tmpList > 2) do
-                Enum.slice(tmpList, 0, 2)
+    tmpList = if (tmpList > 100) do
+                Enum.slice(tmpList, 0, 50)
               else
                 tmpList
               end

@@ -9,12 +9,12 @@ defmodule PROJECT4CLIENT do
               {:logout} -> GenServer.cast({MyServer, server}, {:logout ,userName, self()})
                            timeLine
               {:follow, user} -> 
-                  IO.inspect(user<>" following "<>userName)
+                  #IO.inspect(user<>" following "<>userName)
                   GenServer.cast({MyServer, server}, {:follow ,user, userName, self()})
                   timeLine
-              {:success, info} -> IO.inspect(info)
+              {:success, info} -> #IO.inspect(info)
                   timeLine
-              {:failed, info} -> IO.inspect(info)
+              {:failed, info} -> #IO.inspect(info)
                   timeLine
               {:tweet} -> GenServer.cast({MyServer, server}, {:tweet, userName, 
                                                   to_string(:os.system_time(:millisecond)), self()})
@@ -28,28 +28,28 @@ defmodule PROJECT4CLIENT do
               {:myMention} -> GenServer.cast({MyServer, server}, {:myMention, userName, self()})
                   timeLine
               {:myMention, tweets} -> 
-                  IO.puts("My mentions "<> userName)
-                  IO.inspect(tweets)
+                  #IO.puts("My mentions "<> userName)
+                  #IO.inspect(tweets)
                   timeLine
               {:gettweetsWithTag, tag} -> GenServer.cast({MyServer, server}, {:tweetsWithTag, tag, self()})
                   timeLine
               {:tweetsWithTag, tweets} ->
-                  IO.puts("Tweets with tag " <> userName ) 
-                  IO.inspect(tweets)
+                  #IO.puts("Tweets with tag " <> userName ) 
+                  #IO.inspect(tweets)
                   timeLine
               {:getsubscribedTweets} -> GenServer.cast({MyServer, server}, {:subscribedTweets ,userName, self()})
                   timeLine
               {:subscribedTweets, tweets} -> 
-                  IO.puts("Subscribed Tweets " <> userName)
-                  IO.inspect(tweets)
+                  #IO.puts("Subscribed Tweets " <> userName)
+                  #IO.inspect(tweets)
                   if (tweets != nil) do
                       tweets
                   else
                       timeLine
                   end
               {:timeLine, tweet} ->
-                  IO.puts("Timeline update " <> userName)
-                  IO.inspect(tweet) 
+                  #IO.puts("Timeline update " <> userName)
+                  #IO.inspect(tweet) 
                   [tweet | timeLine]
               {:retweet} ->
                   len = length(timeLine)
@@ -184,21 +184,16 @@ defmodule PROJECT4CLIENT do
           startWorker(pid, userNames, randTags, waitTime)
       end
   
-      def createWorkGenerators(readerPids, _, _, _) when readerPids == [] do
+      def createWorkGenerators(readerPids, _, _, _, _) when readerPids == [] do
           
       end
   
-      def createWorkGenerators(readerPids, userNames, randTags, count) do
+      def createWorkGenerators(readerPids, userNames, randTags, count, pos) do
           [hd | tl] = readerPids
-          #waitTime = round(Float.ceil(count/50)*200)
           waitTime = round(Float.ceil(count/10)*(count/5000))
-          # waitTime = if (waitTime > 250) do
-          #                 250
-          #             else
-          #                 waitTime
-          #             end
+          waitTime = round(Float.ceil(waitTime - waitTime/(3*pos)))
           spawn(PROJECT4CLIENT, :startWorker, [hd, userNames, randTags, waitTime])
-          createWorkGenerators(tl, userNames, randTags, count)
+          createWorkGenerators(tl, userNames, randTags, count, pos+1)
       end
   
       def loop() do
@@ -215,8 +210,8 @@ defmodule PROJECT4CLIENT do
           loginUsers(userNames, readerPids)
           :timer.sleep(numUsers)
           addFollowers(userNames, userNames, 7*length(userNames)/100+1, 1, readerPids)
-          :timer.sleep(numUsers)
-          createWorkGenerators(readerPids, userNames, randTags, length(userNames))
+          :timer.sleep(numUsers*2)
+          createWorkGenerators(readerPids, userNames, randTags, length(userNames), 1)
           loop()
       end
   

@@ -87,7 +87,7 @@ defmodule SERVER do
               end
     if (registeredUsers != %{}) do
       channel = Map.get(registeredUsers, hd)
-      if (channel != :null) do
+      if (channel != :null && channel != nil) do
         PhoenixChannelClient.push(channel, "out_msg", 
         %{"msg" => Tuple.to_list({:timeLine, Tuple.to_list({action, Map.get(tweets, tweetid)})})})
       end
@@ -176,7 +176,7 @@ defmodule SERVER do
                   tweetids
                end
     channel = registeredUsers[userName]
-    if (channel != :null) do
+    if (channel != :null && channel != nil) do
       PhoenixChannelClient.push(channel, "out_msg",
         %{"msg" => Tuple.to_list({:myMention, sendInfo})})
     end
@@ -197,8 +197,10 @@ defmodule SERVER do
                         registeredUsers
                       end
     channel = registeredUsers[userName]
-    PhoenixChannelClient.push(channel, "out_msg",
-      %{"msg" => Tuple.to_list({:tweetsWithTag, sendInfo})})
+    if (channel != :null && channel != nil) do
+      PhoenixChannelClient.push(channel, "out_msg",
+        %{"msg" => Tuple.to_list({:tweetsWithTag, sendInfo})})
+    end
     {:noreply, {timeLines, tweets, registeredUsers}}
   end
 

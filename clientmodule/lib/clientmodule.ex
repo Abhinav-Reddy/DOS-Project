@@ -63,7 +63,7 @@ defmodule Clientmodule do
                     Tuple.to_list({:retweet, userName, tweet})}) 
           end
           timeLine
-       ["out_msg", event] ->
+       {"out_msg", event} ->
             event = event["msg"]
             #IO.inspect(userName)
             #IO.inspect(event)
@@ -72,7 +72,7 @@ defmodule Clientmodule do
             else
                 timeLine
             end
-        event -> 2
+        event ->
             timeLine
       end
       userFunctions(channel, timeLine, allUsers, userName)
@@ -279,6 +279,8 @@ defmodule Clientmodule do
       send(Enum.at(readerPids, 0), {:tweet})
       :timer.sleep(100)
       #IO.puts(TWITTER.getLoad(server))
+      :timer.sleep(100)
+      send(Enum.at(readerPids, 1), {:login})
       :timer.sleep(100)
       send(Enum.at(readerPids, 1), {:login})
       :timer.sleep(100)

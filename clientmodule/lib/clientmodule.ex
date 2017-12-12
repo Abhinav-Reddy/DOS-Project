@@ -216,7 +216,7 @@ defmodule Clientmodule do
         waitTime = if (count <= 10) do
                       100
                     else
-                      round(Float.ceil(1300*(count/100-1)))
+                      round(Float.ceil(500*(count/100-1)))
                     end
       #   waitTime = round(Float.ceil(count/5)*(count/5000))
         waitTime = round(Float.ceil(waitTime - waitTime/(3*pos)))

@@ -21,7 +21,6 @@ defmodule Project5testWeb.UserSocket do
   # See `Phoenix.Token` documentation for examples in
   # performing token verification on connect.
   def connect(params, socket) do
-    IO.inspect(params)
     {:ok,  assign(socket, "isUser", params["isUser"])}
   end
 

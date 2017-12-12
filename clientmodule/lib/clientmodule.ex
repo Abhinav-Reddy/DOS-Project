@@ -1,45 +1,5 @@
-defmodule ChannelClient do
-  use GenServer
-  def start_link(channel, _) do
-    GenServer.start_link(__MODULE__, [channel: channel], name: __MODULE__)
-  end
-
-  def init([channel: channel]) do
-    case PhoenixChannelClient.join(channel) do
-      {:ok, _} -> {:ok, []}
-      {:error, reason} -> {:stop, reason}
-      :timeout -> {:stop, :timeout}
-    end
-    PhoenixChannelClient.push(channel, "new_msg", %{"msg" => "Hi"})
-    {:ok, []}  
-  end
-  
-  def handle_info(event, state) do
-     IO.inspect(event)
-     {:noreply, state}
-   end
-end
 
 defmodule Clientmodule do
-  def start(userName) do    
-    {:ok, pid} = PhoenixChannelClient.start_link()
-    {:ok, socket} = PhoenixChannelClient.connect(pid,
-      host: "localhost",
-      port: 4000,
-      path: "/socket/websocket",
-      params: %{"isUser" => "true"}
-      )
-    
-    channel = PhoenixChannelClient.channel(socket, "login:"<>userName, %{name: "Ryo"})
-    
-    ChannelClient.start_link(channel, [])
-    #PhoenixChannelClient
-  end
-end
-
-
-
-defmodule PROJECT4CLIENT do
 
   def createChannel(channelName) do
     {:ok, pid} = PhoenixChannelClient.start_link()
@@ -47,6 +7,7 @@ defmodule PROJECT4CLIENT do
       host: "localhost",
       port: 4000,
       path: "/socket/websocket",
+      params: %{"isUser" => "true"}
       )
       channel = PhoenixChannelClient.channel(socket, channelName, %{name: channelName})
       case PhoenixChannelClient.join(channel) do
@@ -64,68 +25,55 @@ defmodule PROJECT4CLIENT do
                channel
              end 
     timeLine = receive do
-      {:login} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => {:login, userName}})
-      PhoenixChannelClient.push(channel, "new_msg", %{"msg" => {:subscribedTweets, userName}})
+      {:login} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => Tuple.to_list({:login, userName})})
+      PhoenixChannelClient.push(channel, "new_msg", %{"msg" => Tuple.to_list({:subscribedTweets, userName})})
                   timeLine
-      {:logout} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => {:logout ,userName}})
+      {:logout} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => Tuple.to_list({:logout ,userName})})
                     timeLine
       {:follow, user} -> 
-          IO.inspect(user<>" following "<>userName)
-          PhoenixChannelClient.push(channel, "new_msg", %{"msg" => {:follow ,user, userName}})
+          PhoenixChannelClient.push(channel, "new_msg", %{"msg" => Tuple.to_list({:follow ,user, userName})})
           timeLine
-    #   {:success, info} -> IO.inspect(info)
-    #       timeLine
-    #   {:failed, info} -> IO.inspect(info)
-    #       timeLine
-      {:tweet} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => {:tweet, userName, 
-                                          to_string(:os.system_time(:millisecond))}})
+      {:tweet} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => Tuple.to_list({:tweet, userName, 
+                                          to_string(:os.system_time(:millisecond))})})
           timeLine
-      {:tweet, :mention, user} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => {:tweet, userName, 
-                                      to_string(:os.system_time(:millisecond)) <> " @" <> user}})
+      {:tweet, :mention, user} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => 
+            Tuple.to_list({:tweet, userName, to_string(:os.system_time(:millisecond)) <> " @" <> user})})
           timeLine
-      {:tweet, :tag, tag} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => {:tweet, userName, 
-                                      to_string(:os.system_time(:millisecond)) <> " #" <> tag}})
+      {:tweet, :tag, tag} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => Tuple.to_list(
+                {:tweet, userName, to_string(:os.system_time(:millisecond)) <> " #" <> tag})})
           timeLine        
-      {:myMention} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => {:myMention, userName}})
+      {:myMention} -> PhoenixChannelClient.push(channel, "new_msg", %{"msg" => 
+            Tuple.to_list({:myMention, userName})})
           timeLine
-    #   {:myMention, tweets} -> 
-    #       IO.puts("My mentions "<> userName)
-    #       IO.inspect(tweets)
-    #       timeLine
+    
       {:gettweetsWithTag, tag} -> PhoenixChannelClient.push(channel, "new_msg", 
-            %{"msg" => {:tweetsWithTag, tag, userName}})
+            %{"msg" => Tuple.to_list({:tweetsWithTag, tag, userName})})
           timeLine
-    #   {:tweetsWithTag, tweets} ->
-    #       IO.puts("Tweets with tag " <> userName ) 
-    #       IO.inspect(tweets)
-    #       timeLine
+    
       {:getsubscribedTweets} -> PhoenixChannelClient.push(channel, "new_msg", 
-            %{"msg" => {:subscribedTweets ,userName}})
+            %{"msg" => Tuple.to_list({:subscribedTweets ,userName})})
           timeLine
-    #   {:subscribedTweets, tweets} -> 
-    #       IO.puts("Subscribed Tweets " <> userName)
-    #       IO.inspect(tweets)
-    #       if (tweets != nil) do
-    #           tweets
-    #       else
-    #           timeLine
-    #       end
-    #   {:timeLine, tweet} ->
-    #       IO.puts("Timeline update " <> userName)
-    #       IO.inspect(tweet) 
-    #       [tweet | timeLine]
+    
       {:retweet} ->
           len = length(timeLine)
           if (len > 0) do
               len = :rand.uniform(len) - 1
-              {_, tweet} = Enum.at(timeLine, len)
-              PhoenixChannelClient.push(channel, "new_msg", %{"msg" => {:retweet, userName, tweet}}) 
+              [_, tweet] = Enum.at(timeLine, len)
+              PhoenixChannelClient.push(channel, "new_msg", %{"msg" => 
+                    Tuple.to_list({:retweet, userName, tweet})}) 
           end
           timeLine
-      {event} ->
-          IO.inspect(userName)
-          IO.inspect(event)
-          timeLine
+       ["out_msg", event] ->
+            event = event["msg"]
+            #IO.inspect(userName)
+            #IO.inspect(event)
+            if (Enum.at(event, 0) == "subscribedTweets" && Enum.at(event, 1) != nil) do
+                Enum.at(event, 1)
+            else
+                timeLine
+            end
+        event -> 2
+            timeLine
       end
       userFunctions(channel, timeLine, allUsers, userName)
     end
@@ -137,12 +85,16 @@ defmodule PROJECT4CLIENT do
     def registerUsers(users, readerPids, allUsers) do
         [userName | tl] = users
         channel = createChannel("login:"<>userName)
+        PhoenixChannelClient.push(channel, "new_msg", %{"msg" => Tuple.to_list({:register, userName})})
         receive do
-            {event} -> IO.inspect(event)
+            event -> 1 #IO.inspect(event)
+        end
+        receive do
+            event -> 1 #IO.inspect(event)
         end
         PhoenixChannelClient.leave(channel)
         timeLine = []
-        readerPid = spawn(PROJECT4CLIENT, :userFunctions, [:null, timeLine, allUsers, userName])
+        readerPid = spawn(Clientmodule, :userFunctions, [:null, timeLine, allUsers, userName])
         registerUsers(tl, [readerPid | readerPids], allUsers)
     end
 
@@ -204,6 +156,7 @@ defmodule PROJECT4CLIENT do
     end
 
     def addFollowers(remUsers, allUsers, count, factor, readerPids) do
+        
         [hd | tl] = remUsers
         [hdPid | tlPids] = readerPids
         tmpCnt = if (count/factor > 5) do
@@ -217,9 +170,8 @@ defmodule PROJECT4CLIENT do
     end
 
     def startWorker(pid, userNames, randTags, waitTime) do
-        #IO.inspect(waitTime)
         :timer.sleep(waitTime)
-        action = :rand.uniform(90)
+        action = :rand.uniform(85)
         if (action <= 15) do
             tweetAction = :rand.uniform(3)
             if (tweetAction == 1) do
@@ -238,10 +190,13 @@ defmodule PROJECT4CLIENT do
                 send(pid, {:myMention})
         else if (action <= 75) do
                 send(pid, {:gettweetsWithTag, Enum.at(randTags, :rand.uniform(length(randTags)-1))})
-        else if (action <= 83) do
+        else if (action == 83) do
                 send(pid, {:logout})
-        else
-            send(pid, {:login})
+                :timer.sleep(5000)
+        else if (action == 84) do
+                send(pid, {:login})
+                :timer.sleep(5000)
+        end
         end
         end
         end
@@ -256,15 +211,17 @@ defmodule PROJECT4CLIENT do
     end
 
     def createWorkGenerators(readerPids, userNames, randTags, count, pos) do
+        #:timer.sleep(5000)
         [hd | tl] = readerPids
-        waitTime = if (count <= 1000) do
-                      50
+        waitTime = if (count <= 10) do
+                      100
                     else
-                      round(Float.ceil(50+100*(count/1000-1)))
+                      round(Float.ceil(1300*(count/100-1)))
                     end
       #   waitTime = round(Float.ceil(count/5)*(count/5000))
         waitTime = round(Float.ceil(waitTime - waitTime/(3*pos)))
-        spawn(PROJECT4CLIENT, :startWorker, [hd, userNames, randTags, waitTime])
+        spawn(Clientmodule, :startWorker, [hd, userNames, randTags, waitTime])
+        :timer.sleep(10)
         createWorkGenerators(tl, userNames, randTags, count, pos+1)
     end
 
@@ -272,17 +229,18 @@ defmodule PROJECT4CLIENT do
         :timer.sleep(2)
         loop()
     end
+    
     def startClients(numUsers) do
         #{:ok, server} = TWITTER.start_link([])
         userNames = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         randTags = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         readerPids = registerUsers(userNames, [], userNames)
         readerPids = Enum.reverse(readerPids)
-        :timer.sleep(numUsers)
+        :timer.sleep(3000)
         loginUsers(userNames, readerPids)
-        :timer.sleep(numUsers)
+        :timer.sleep(3000)
         addFollowers(userNames, userNames, 7*length(userNames)/100+1, 1, readerPids)
-        :timer.sleep(numUsers)
+        :timer.sleep(3000)
         createWorkGenerators(readerPids, userNames, randTags, length(userNames), 1)
         loop()
     end

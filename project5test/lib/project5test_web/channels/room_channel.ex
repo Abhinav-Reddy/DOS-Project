@@ -2,12 +2,11 @@ defmodule Project5testWeb.LoginChannel do
     use Phoenix.Channel
   
     def join(userName, message, socket) do
-        IO.inspect(message)
         {:ok, socket}
     end
 
     def handle_in("new_msg", query, socket) do
-        GenServer.cast(MyServer, query["msg"])
+        GenServer.cast(MyServer, List.to_tuple(query["msg"]))
         {:noreply, socket}
     end
 
@@ -15,17 +14,6 @@ defmodule Project5testWeb.LoginChannel do
         broadcast! socket, "out_msg", query
         {:noreply, socket}
     end
-
-    # intercept ["new_msg"]
-    
-    # def handle_out("new_msg", msg, socket) do
-    #   if (socket.assigns["isUser"] == "true") do
-    #     {:noreply, socket}
-    #   else
-    #     push socket, "new_msg", msg
-    #     {:noreply, socket}
-    #   end
-    # end
 
     intercept ["out_msg"]
     

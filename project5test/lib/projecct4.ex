@@ -93,39 +93,39 @@ defmodule TWITTER do
     end
 
     def register(server, {userName}) do
-      GenServer.cast(server, {:register, userName})
+      GenServer.cast(server, {"register", userName})
     end
   
     def login(server, {userName}) do
-      GenServer.cast(server, {:login, userName})
+      GenServer.cast(server, {"login", userName})
     end
   
     def logout(server, {userName}) do
-      GenServer.cast(server, {:logout, userName})
+      GenServer.cast(server, {"logout", userName})
     end
 
     def follow(server, {userName, follow}) do
-      GenServer.cast(server, {:follow, userName, follow})
+      GenServer.cast(server, {"follow", userName, follow})
     end
 
     def tweet(server, {userName, tweet}) do
-      GenServer.cast(server, {:tweet, userName, tweet})
+      GenServer.cast(server, {"tweet", userName, tweet})
     end
 
     def retweet(server, {userName, tweet}) do
-      GenServer.cast(server, {:retweet, userName, tweet})
+      GenServer.cast(server, {"retweet", userName, tweet})
     end
 
     def mentions(server, {userName}) do
-      GenServer.cast(server, {:myMention, userName})
+      GenServer.cast(server, {"myMention", userName})
     end
 
     def taggedTweets(server, {tag, userName}) do
-      GenServer.cast(server, {:tweetsWithTag, tag, userName})
+      GenServer.cast(server, {"tweetsWithTag", tag, userName})
     end
 
     def subscribedTweets(server, {userName}) do
-      GenServer.cast(server, {:subscribedTweets, userName})
+      GenServer.cast(server, {"subscribedTweets", userName})
     end
 
     def getLoad(server) do
@@ -133,28 +133,28 @@ defmodule TWITTER do
     end
 
 
-    def handle_cast({:register, userName}, 
+    def handle_cast({"register", userName}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       key = HELPER.getKey(userName)
       SERVER.register(Map.get(servers, key), {userName})
       {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
   
-    def handle_cast({:login, userName}, 
+    def handle_cast({"login", userName}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       key = HELPER.getKey(userName)
       SERVER.login(Map.get(servers, key), {userName})
       {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
   
-    def handle_cast({:logout, userName}, 
+    def handle_cast({"logout", userName}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       key = HELPER.getKey(userName)
       SERVER.logout(Map.get(servers, key), {userName})
       {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
 
-    def handle_cast({:follow, userName, follow}, 
+    def handle_cast({"follow", userName, follow}, 
                   {connections, tweetids, servers, tweetcnt, loadcnt}) do
       tmpList = if (Map.has_key?(connections, follow)) do
                   Map.get(connections, follow)
@@ -169,7 +169,7 @@ defmodule TWITTER do
       {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
 
-    def handle_cast({:tweet, userName, tweet}, 
+    def handle_cast({"tweet", userName, tweet}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       tweetids = Map.put(tweetids, tweet, tweetcnt)
       # spawn(HELPER, :sendToServers, [Map.get(connections, userName), 
@@ -179,7 +179,7 @@ defmodule TWITTER do
       {:noreply, {connections, tweetids, servers, tweetcnt+1, loadcnt+1}}
     end
 
-    def handle_cast({:retweet, userName, tweet}, 
+    def handle_cast({"retweet", userName, tweet}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       tweetid = Map.get(tweetids, tweet)
       # spawn(HELPER, :sendToServers, [Map.get(connections, userName),
@@ -189,20 +189,20 @@ defmodule TWITTER do
       {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
 
-    def handle_cast({:myMention, userName}, 
+    def handle_cast({"myMention", userName}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       key = HELPER.getKey(userName)
       SERVER.myMention(Map.get(servers, key), {userName})
       {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
 
-    def handle_cast({:tweetsWithTag, tag, userName}, 
+    def handle_cast({"tweetsWithTag", tag, userName}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       SERVER.getTweetsWithTag(Map.get(servers, :tags), {tag, userName})
       {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
 
-    def handle_cast({:subscribedTweets, userName}, 
+    def handle_cast({"subscribedTweets", userName}, 
                     {connections, tweetids, servers, tweetcnt, loadcnt}) do
       key = HELPER.getKey(userName)
       SERVER.getSubscribedTweets(Map.get(servers, key), {userName})
@@ -210,7 +210,6 @@ defmodule TWITTER do
     end
 
     def handle_cast(junk, {connections, tweetids, servers, tweetcnt, loadcnt}) do
-      IO.inspect(junk)
       {:noreply, {connections, tweetids, servers, tweetcnt, loadcnt+1}}
     end
 

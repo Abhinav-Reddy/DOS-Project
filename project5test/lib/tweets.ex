@@ -48,7 +48,7 @@ defmodule SERVER do
 
   def getTweetsFromIds(tweets, tweetids, res) do
     [{tweetid, action} | tl] = tweetids
-    getTweetsFromIds(tweets, tl, [{action, Map.get(tweets, tweetid)} | res])
+    getTweetsFromIds(tweets, tl, [Tuple.to_list({action, Map.get(tweets, tweetid)}) | res])
   end
 
   def getTweetsWithAction(_, tweetids, _, res) when tweetids == [] do
@@ -62,7 +62,7 @@ defmodule SERVER do
   def getTweetsWithAction(tweets, tweetids, cmp, res) do
     [{tweetid, action} | tl] = tweetids
     if (String.contains?(action, cmp) == true) do
-      getTweetsWithAction(tweets, tl, cmp, [{action, Map.get(tweets, tweetid)} | res])
+      getTweetsWithAction(tweets, tl, cmp, [Tuple.to_list({action, Map.get(tweets, tweetid)}) | res])
     else
       getTweetsWithAction(tweets, tl, cmp, res)
     end
@@ -89,7 +89,7 @@ defmodule SERVER do
       channel = Map.get(registeredUsers, hd)
       if (channel != :null) do
         PhoenixChannelClient.push(channel, "out_msg", 
-        %{"msg" => {:timeLine, {action, Map.get(tweets, tweetid)}}})
+        %{"msg" => Tuple.to_list({:timeLine, Tuple.to_list({action, Map.get(tweets, tweetid)})})})
       end
     end
     updateTimeLines(tl, tweetid, action, Map.put(timeLines, hd, [{tweetid, action} | tmpList]), 
@@ -102,6 +102,7 @@ defmodule SERVER do
       host: "localhost",
       port: 4000,
       path: "/socket/websocket",
+      params: %{"isUser" => "false"}
     )
     channel = PhoenixChannelClient.channel(socket, channelName, %{name: channelName})
     case PhoenixChannelClient.join(channel) do
@@ -118,12 +119,12 @@ defmodule SERVER do
     channel = createChannel("login:"<>userName)
     if Map.has_key?(registeredUsers, userName) do
       PhoenixChannelClient.push(channel, "out_msg", 
-        %{"msg" => {:failed, "User name already exists " <> userName}})
+        %{"msg" => Tuple.to_list({:failed, "User name already exists " <> userName})})
       PhoenixChannelClient.leave(channel)
       {:noreply, {timeLines, tweets, registeredUsers}}
     else
       PhoenixChannelClient.push(channel, "out_msg",
-        %{"msg" => {:success, "Registered successfully " <> userName}})
+        %{"msg" => Tuple.to_list({:success, "Registered successfully " <> userName})})
       PhoenixChannelClient.leave(channel)
       {:noreply, {timeLines, tweets, Map.put(registeredUsers, userName, :null)} }
     end
@@ -134,12 +135,12 @@ defmodule SERVER do
     channel = createChannel("login:"<>userName)
     if Map.has_key?(registeredUsers, userName) == false do
       PhoenixChannelClient.push(channel, "out_msg",
-        %{"msg" => {:failed, "User name doesnt exist "<> userName}})
+        %{"msg" => Tuple.to_list({:failed, "User name doesnt exist "<> userName})})
       PhoenixChannelClient.leave(channel)
       {:noreply, {timeLines, tweets, registeredUsers}}
     else
       PhoenixChannelClient.push(channel, "out_msg",
-        %{"msg" => {:success, "Login successfull " <> userName}})
+        %{"msg" => Tuple.to_list({:success, "Login successfull " <> userName})})
       { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, channel)} }
     end
   end
@@ -150,8 +151,11 @@ defmodule SERVER do
       {:noreply, {timeLines, tweets, registeredUsers}}
     else
       channel = Map.get(registeredUsers, userName)
-      PhoenixChannelClient.push(channel, "out_msg",
-        %{"msg" => {:success, "Logout successfull " <> userName}})
+      if (channel != :null) do
+        PhoenixChannelClient.push(channel, "out_msg",
+          %{"msg" => Tuple.to_list({:success, "Logout successfull " <> userName})})
+        PhoenixChannelClient.leave(channel)
+      end
       { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, :null)} }
     end
   end
@@ -172,8 +176,10 @@ defmodule SERVER do
                   tweetids
                end
     channel = registeredUsers[userName]
-    PhoenixChannelClient.push(channel, "out_msg",
-      %{"msg" => {:myMention, sendInfo}})
+    if (channel != :null) do
+      PhoenixChannelClient.push(channel, "out_msg",
+        %{"msg" => Tuple.to_list({:myMention, sendInfo})})
+    end
     {:noreply, {timeLines, tweets, registeredUsers}}
   end
 
@@ -185,9 +191,14 @@ defmodule SERVER do
                else
                 tweetids
                end
+    registeredUsers = if (Map.has_key?(registeredUsers, userName) == false) do
+                        Map.put(registeredUsers, userName, createChannel("login:"<>userName))
+                      else
+                        registeredUsers
+                      end
     channel = registeredUsers[userName]
     PhoenixChannelClient.push(channel, "out_msg",
-      %{"msg" => {:tweetsWithTag, sendInfo}})
+      %{"msg" => Tuple.to_list({:tweetsWithTag, sendInfo})})
     {:noreply, {timeLines, tweets, registeredUsers}}
   end
 
@@ -200,13 +211,21 @@ defmodule SERVER do
                 tweetids
                end
     channel = registeredUsers[userName]
-    PhoenixChannelClient.push(channel, "out_msg",
-      %{"msg" => {:subscribedTweets, sendInfo}})
+    if (channel != :null) do
+      PhoenixChannelClient.push(channel, "out_msg",
+        %{"msg" => Tuple.to_list({:subscribedTweets, sendInfo})})
+    end
     {:noreply, {timeLines, tweets, registeredUsers}}
   end
 
   def handle_call({:ping}, __from, {timeLines,tweets, registeredUsers}) do
     {:reply, :ok, {timeLines, tweets, registeredUsers}}
+  end
+
+  def handle_info(info, 
+                    {timeLines, tweets, registeredUsers}) do
+    
+    {:noreply, {timeLines, tweets, registeredUsers}}
   end
 
 end

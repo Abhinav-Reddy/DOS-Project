@@ -132,16 +132,25 @@ defmodule SERVER do
 
   def handle_cast({:login, userName}, 
                     {timeLines, tweets, registeredUsers}) do
-    channel = createChannel("login:"<>userName)
+    
     if Map.has_key?(registeredUsers, userName) == false do
+      channel = createChannel("login:"<>userName)
       PhoenixChannelClient.push(channel, "out_msg",
         %{"msg" => Tuple.to_list({:failed, "User name doesnt exist "<> userName})})
       PhoenixChannelClient.leave(channel)
       {:noreply, {timeLines, tweets, registeredUsers}}
     else
-      PhoenixChannelClient.push(channel, "out_msg",
-        %{"msg" => Tuple.to_list({:success, "Login successfull " <> userName})})
-      { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, channel)} }
+      channel2 = registeredUsers[userName]
+      if (channel2 == :null) do
+        channel = createChannel("login:"<>userName)
+        PhoenixChannelClient.push(channel, "out_msg",
+          %{"msg" => Tuple.to_list({:success, "Login successfull " <> userName})})
+        { :noreply, {timeLines, tweets, Map.put(registeredUsers, userName, channel)} }
+      else
+        PhoenixChannelClient.push(channel2, "out_msg",
+          %{"msg" => Tuple.to_list({:success, "Already Logged in " <> userName})})
+        { :noreply, {timeLines, tweets, registeredUsers} }
+      end
     end
   end
 

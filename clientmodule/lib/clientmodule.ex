@@ -301,6 +301,19 @@ defmodule Clientmodule do
     end
   end
 
+  defmodule ClientmoduleStart do
+    def main([]) do
+      IO.puts "Enter Valid Number of Clients"
+    end
+  
+    def main(argv) do
+        val = List.first(argv)
+        user_count = String.to_integer(val)
+        Clientmodule.startClient(user_count)
+    end
+      
+end
+
       
 
 

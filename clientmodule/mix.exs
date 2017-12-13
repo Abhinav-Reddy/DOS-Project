@@ -6,9 +6,14 @@ defmodule Clientmodule.Mixfile do
       app: :clientmodule,
       version: "0.1.0",
       elixir: "~> 1.5",
+      escript: escript_config(),
       start_permanent: Mix.env == :prod,
       deps: deps()
     ]
+  end
+
+  defp escript_config do
+    [main_module: ClientmoduleStart]
   end
 
   # Run "mix help compile.app" to learn about applications.

@@ -206,23 +206,19 @@ defmodule Clientmodule do
         startWorker(pid, userNames, randTags, waitTime)
     end
 
-    def createWorkGenerators(readerPids, _, _, _, _) when readerPids == [] do
+    def createWorkGenerators(readerPids, _, _, _, _, _) when readerPids == [] do
         
     end
 
-    def createWorkGenerators(readerPids, userNames, randTags, count, pos) do
+    def createWorkGenerators(readerPids, userNames, randTags, count, pos, numReq) do
         #:timer.sleep(5000)
         [hd | tl] = readerPids
-        waitTime = if (count <= 10) do
-                      100
-                    else
-                      round(Float.ceil(500*(count/100-1)))
-                    end
+        waitTime = 1000*count/numReq
       #   waitTime = round(Float.ceil(count/5)*(count/5000))
         waitTime = round(Float.ceil(waitTime - waitTime/(3*pos)))
         spawn(Clientmodule, :startWorker, [hd, userNames, randTags, waitTime])
         :timer.sleep(10)
-        createWorkGenerators(tl, userNames, randTags, count, pos+1)
+        createWorkGenerators(tl, userNames, randTags, count, pos+1, numReq)
     end
 
     def loop() do
@@ -230,7 +226,7 @@ defmodule Clientmodule do
         loop()
     end
     
-    def startClients(numUsers) do
+    def startClients(numUsers, numReq) do
         #{:ok, server} = TWITTER.start_link([])
         userNames = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         randTags = getRandomNames(numUsers, [], "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -241,7 +237,7 @@ defmodule Clientmodule do
         :timer.sleep(3000)
         addFollowers(userNames, userNames, 7*length(userNames)/100+1, 1, readerPids)
         :timer.sleep(3000)
-        createWorkGenerators(readerPids, userNames, randTags, length(userNames), 1)
+        createWorkGenerators(readerPids, userNames, randTags, length(userNames), 1, numReq)
         loop()
     end
 
@@ -297,8 +293,8 @@ defmodule Clientmodule do
       #IO.puts(TWITTER.getLoad(server))
     end
     
-    def startClient(numUsers) do
-        startClients(numUsers)
+    def startClient(numUsers, numReq) do
+        startClients(numUsers, numReq)
         #test(numUsers)
     end
   end
